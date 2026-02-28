@@ -1,0 +1,21 @@
+services:
+  garmin-workouts-mcp-fork:
+    image: garmin-workouts-mcp:fork-strength
+    build:
+      context: ../../
+      dockerfile: deploy/synology/Dockerfile
+    container_name: garmin-workouts-mcp-fork
+    restart: unless-stopped
+    environment:
+      GARTH_HOME: /data/.garth
+      GARMIN_STRENGTH_EXERCISES_CSV: /app/garmin_exercises_keys_en_fr.csv
+      # Optional fallback auth (not recommended with 2FA):
+      # GARMIN_EMAIL: your_email@example.com
+      # GARMIN_PASSWORD: your_password
+    volumes:
+      - ./data:/data
+    command: ["garmin-workouts-mcp"]
+    # If your current MCP deployment uses HTTP/SSE, expose the same container port
+    # and change the host port during test phase to avoid conflicts:
+    # ports:
+    #   - "18000:8000"

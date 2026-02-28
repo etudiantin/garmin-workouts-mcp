@@ -7,6 +7,7 @@ An MCP server that allows you to create, list, and manage Garmin Connect workout
 ## Features
 
 - **Create workouts**: Generate structured Garmin workouts from natural language descriptions using AI
+- **Strength native upload**: Upload full Garmin strength workout JSON without dropping category/exercise/weight metadata
 - **List workouts**: View all your existing workouts on Garmin Connect
 - **Get workout details**: Retrieve detailed information about specific workouts
 - **Schedule workouts**: Schedule workouts on specific dates in Garmin Connect
@@ -103,6 +104,70 @@ Use the `upload_workout` tool to upload structured workout data to Garmin Connec
 ```
 upload_workout(workout_data_json)
 ```
+
+This tool remains optimized for the simplified cardio-oriented workout schema.
+
+### Build Strength Workout
+
+Use the `build_strength_workout` tool to build and validate a Garmin native strength workout payload.
+
+```
+build_strength_workout(workout_data, "simple")
+build_strength_workout(workout_data, "native")
+```
+
+- `input_format="simple"` accepts a simplified schema:
+  - root: `name`, `description`, `steps`
+  - step types: `exercise`, `rest`, `repeat`
+- `input_format="native"` accepts native Garmin JSON directly and normalizes numbering (`stepOrder`, `childStepId`).
+
+The tool returns:
+
+```
+{"workout": <native_garmin_strength_payload>}
+```
+
+### Upload Strength Workout
+
+Use the `upload_strength_workout` tool to upload native Garmin strength JSON directly.
+
+```
+upload_strength_workout(native_strength_workout_json)
+```
+
+This preserves strength-specific metadata such as:
+- `category`
+- `exerciseName`
+- `weightValue`
+- `weightUnit`
+- `endCondition` (including `reps`, `time`, and `lap.button`)
+- `RepeatGroupDTO` structure
+
+### Strength Workflow Quick Guide
+
+Recommended end-to-end workflow:
+
+1. Build and validate your payload:
+```
+build_strength_workout(workout_data, "simple")
+```
+or
+```
+build_strength_workout(workout_data, "native")
+```
+2. Upload it:
+```
+upload_strength_workout(native_strength_workout_json)
+```
+3. Read it back for verification:
+```
+get_workout("workout_id_here")
+```
+
+For implementation details and complete examples, see:
+- [`docs/strength_support.md`](docs/strength_support.md)
+- [`docs/changes_strength_support.md`](docs/changes_strength_support.md)
+- [`docs/synology_update_guide.md`](docs/synology_update_guide.md)
 
 ### Schedule Workout
 
@@ -221,6 +286,8 @@ The `list_activities` tool supports filtering by the following activity types:
 - `GARMIN_EMAIL`: Your Garmin Connect email address (optional)
 - `GARMIN_PASSWORD`: Your Garmin Connect password (optional)
 - `GARTH_HOME`: Custom location for Garmin credentials (optional, defaults to `~/.garth`)
+- `GARMIN_STRENGTH_EXERCISES_CSV`: Path to the Garmin exercises CSV used for strict `(category, exerciseName)` validation in strength tools (optional, defaults to `garmin_exercises_keys_en_fr.csv` at repo root)
+- `garmin_exercises_keys_en_fr.csv` is versioned in this fork so strict validation works out of the box.
 
 
 ## Credits

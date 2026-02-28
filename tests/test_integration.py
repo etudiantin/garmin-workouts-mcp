@@ -23,6 +23,8 @@ class TestMCPIntegration:
             "schedule_workout",
             "delete_workout",
             "upload_workout",
+            "build_strength_workout",
+            "upload_strength_workout",
             "generate_workout_data_prompt"
         }
 

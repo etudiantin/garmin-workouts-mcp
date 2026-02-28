@@ -5,6 +5,10 @@ import sys
 import logging
 from datetime import datetime
 from .garmin_workout import make_payload
+from .strength_workout import (
+    build_strength_workout_from_simple,
+    prepare_strength_workout_payload,
+)
 
 LIST_WORKOUTS_ENDPOINT = "/workout-service/workouts"
 GET_WORKOUT_ENDPOINT = "/workout-service/workout/{workout_id}"
@@ -211,6 +215,63 @@ def upload_workout(workout_data: dict) -> dict:
 
     except Exception as e:
         raise Exception(f"Failed to upload workout to Garmin Connect: {str(e)}")
+
+
+@mcp.tool
+def build_strength_workout(workout_data: dict, input_format: str) -> dict:
+    """
+    Build and validate a strength workout using Garmin's native workout JSON shape.
+
+    Args:
+        workout_data: Workout payload in either "simple" or "native" format.
+        input_format: Must be either "simple" or "native".
+
+    Returns:
+        A dictionary with a normalized native Garmin strength workout payload.
+    """
+    if not isinstance(input_format, str):
+        raise ValueError("input_format must be 'simple' or 'native'.")
+
+    normalized_input_format = input_format.lower().strip()
+    if normalized_input_format not in {"simple", "native"}:
+        raise ValueError("input_format must be 'simple' or 'native'.")
+
+    if normalized_input_format == "simple":
+        native_workout = build_strength_workout_from_simple(workout_data)
+    else:
+        native_workout = workout_data
+
+    payload = prepare_strength_workout_payload(native_workout)
+    return {"workout": payload}
+
+
+@mcp.tool
+def upload_strength_workout(workout_data: dict) -> dict:
+    """
+    Upload a strength training workout using Garmin's native workout JSON format.
+
+    Args:
+        workout_data: Native Garmin strength workout JSON.
+
+    Returns:
+        The uploaded workout's ID on Garmin Connect.
+    """
+    logger.info("Strength workout data received from client: %s", workout_data)
+
+    try:
+        payload = prepare_strength_workout_payload(workout_data)
+        logger.info("Strength workout payload to be sent to Garmin Connect: %s", payload)
+
+        result = garth.connectapi(CREATE_WORKOUT_ENDPOINT, method="POST", json=payload)
+        logger.info("Response from Garmin Connect for strength workout: %s", result)
+
+        workout_id = result.get("workoutId")
+        if workout_id is None:
+            raise Exception("No workout ID returned")
+
+        return {"workoutId": str(workout_id)}
+    except Exception as e:
+        raise Exception(f"Failed to upload strength workout to Garmin Connect: {str(e)}")
 
 @mcp.tool
 def get_calendar(year: int, month: int, day: int = None, start: int = 1) -> dict:

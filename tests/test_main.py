@@ -2,6 +2,33 @@ import pytest
 from unittest.mock import patch
 
 
+def _native_strength_workout_payload():
+    return {
+        "workoutName": "Strength Test",
+        "description": "Test payload",
+        "sportType": {"sportTypeId": 5, "sportTypeKey": "strength_training"},
+        "workoutSegments": [
+            {
+                "segmentOrder": 1,
+                "sportType": {"sportTypeId": 5, "sportTypeKey": "strength_training"},
+                "workoutSteps": [
+                    {
+                        "type": "ExecutableStepDTO",
+                        "stepType": {"stepTypeId": 5, "stepTypeKey": "rest"},
+                        "endCondition": {"conditionTypeId": 2, "conditionTypeKey": "time"},
+                        "endConditionValue": 30.0,
+                        "targetType": {"workoutTargetTypeId": 1, "workoutTargetTypeKey": "no.target"},
+                        "category": None,
+                        "exerciseName": None,
+                        "weightValue": -1.0,
+                        "weightUnit": {"unitId": 8, "unitKey": "kilogram", "factor": 1000.0},
+                    }
+                ],
+            }
+        ],
+    }
+
+
 class TestListWorkouts:
     """Test cases for the list_workouts tool."""
 
@@ -666,6 +693,105 @@ class TestUploadWorkout:
         with pytest.raises(Exception, match="No workout ID returned"):
             upload_workout_func(workout_data)
 
+
+class TestStrengthWorkoutTools:
+    """Test cases for build_strength_workout and upload_strength_workout tools."""
+
+    @patch("garmin_workouts_mcp.main.prepare_strength_workout_payload")
+    @patch("garmin_workouts_mcp.main.build_strength_workout_from_simple")
+    def test_build_strength_workout_simple_success(self, mock_build_simple, mock_prepare):
+        import garmin_workouts_mcp.main as main_module
+
+        build_strength_workout_func = main_module.build_strength_workout.fn
+        simple_input = {"name": "Simple", "steps": [{"type": "rest", "durationSeconds": 30}]}
+        native_payload = _native_strength_workout_payload()
+        normalized_payload = _native_strength_workout_payload()
+
+        mock_build_simple.return_value = native_payload
+        mock_prepare.return_value = normalized_payload
+
+        result = build_strength_workout_func(simple_input, "simple")
+
+        mock_build_simple.assert_called_once_with(simple_input)
+        mock_prepare.assert_called_once_with(native_payload)
+        assert result == {"workout": normalized_payload}
+
+    @patch("garmin_workouts_mcp.main.prepare_strength_workout_payload")
+    def test_build_strength_workout_native_success(self, mock_prepare):
+        import garmin_workouts_mcp.main as main_module
+
+        build_strength_workout_func = main_module.build_strength_workout.fn
+        native_input = _native_strength_workout_payload()
+        normalized_payload = _native_strength_workout_payload()
+        mock_prepare.return_value = normalized_payload
+
+        result = build_strength_workout_func(native_input, "native")
+
+        mock_prepare.assert_called_once_with(native_input)
+        assert result == {"workout": normalized_payload}
+
+    def test_build_strength_workout_invalid_input_format(self):
+        import garmin_workouts_mcp.main as main_module
+
+        build_strength_workout_func = main_module.build_strength_workout.fn
+        with pytest.raises(ValueError, match="input_format must be 'simple' or 'native'."):
+            build_strength_workout_func({}, "unsupported")
+
+    @patch("garmin_workouts_mcp.main.prepare_strength_workout_payload")
+    @patch("garmin_workouts_mcp.main.garth.connectapi")
+    def test_upload_strength_workout_success(self, mock_connectapi, mock_prepare):
+        import garmin_workouts_mcp.main as main_module
+
+        upload_strength_workout_func = main_module.upload_strength_workout.fn
+        workout_data = _native_strength_workout_payload()
+        normalized_payload = _native_strength_workout_payload()
+
+        mock_prepare.return_value = normalized_payload
+        mock_connectapi.return_value = {"workoutId": "strength_123"}
+
+        result = upload_strength_workout_func(workout_data)
+
+        mock_prepare.assert_called_once_with(workout_data)
+        mock_connectapi.assert_called_once_with(
+            "/workout-service/workout",
+            method="POST",
+            json=normalized_payload
+        )
+        assert result == {"workoutId": "strength_123"}
+
+    @patch("garmin_workouts_mcp.main.prepare_strength_workout_payload")
+    @patch("garmin_workouts_mcp.main.garth.connectapi")
+    def test_upload_strength_workout_no_workout_id(self, mock_connectapi, mock_prepare):
+        import garmin_workouts_mcp.main as main_module
+
+        upload_strength_workout_func = main_module.upload_strength_workout.fn
+        workout_data = _native_strength_workout_payload()
+
+        mock_prepare.return_value = workout_data
+        mock_connectapi.return_value = {}
+
+        with pytest.raises(Exception, match="No workout ID returned"):
+            upload_strength_workout_func(workout_data)
+
+    def test_upload_strength_workout_invalid_sport(self):
+        import garmin_workouts_mcp.main as main_module
+
+        upload_strength_workout_func = main_module.upload_strength_workout.fn
+        workout_data = _native_strength_workout_payload()
+        workout_data["sportType"]["sportTypeKey"] = "running"
+
+        with pytest.raises(Exception, match="sportType.sportTypeKey must be 'strength_training'."):
+            upload_strength_workout_func(workout_data)
+
+    @patch.dict("os.environ", {"GARMIN_STRENGTH_EXERCISES_CSV": "/tmp/does-not-exist.csv"})
+    def test_upload_strength_workout_csv_missing(self):
+        import garmin_workouts_mcp.main as main_module
+
+        upload_strength_workout_func = main_module.upload_strength_workout.fn
+        workout_data = _native_strength_workout_payload()
+
+        with pytest.raises(Exception, match="Exercise CSV file not found"):
+            upload_strength_workout_func(workout_data)
 
 
 class TestGetCalendar:
