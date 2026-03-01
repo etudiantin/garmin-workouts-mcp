@@ -29,6 +29,30 @@ def _native_strength_workout_payload():
     }
 
 
+class _FakeResponse:
+    def __init__(self, status_code=400, json_body=None, text_body=""):
+        self.status_code = status_code
+        self._json_body = json_body
+        self.text = text_body
+
+    def json(self):
+        if self._json_body is None:
+            raise ValueError("No JSON body")
+        return self._json_body
+
+
+class _FakeHTTPError(Exception):
+    def __init__(self, response):
+        super().__init__("400 Client Error: Bad Request")
+        self.response = response
+
+
+class _FakeGarthHTTPError(Exception):
+    def __init__(self, response):
+        super().__init__("Error in request: 400 Client Error: Bad Request")
+        self.error = _FakeHTTPError(response)
+
+
 class TestListWorkouts:
     """Test cases for the list_workouts tool."""
 
@@ -307,8 +331,8 @@ class TestGetActivity:
 
         # Assert
         mock_connectapi.assert_called_once_with(f"/activity-service/activity/{activity_id}")
-        assert result == expected_activity
-        assert result["activityId"] == activity_id
+        assert result == {"activity": expected_activity}
+        assert result["activity"]["activityId"] == activity_id
 
     @patch('garmin_workouts_mcp.main.garth.connectapi')
     def test_get_activity_not_found(self, mock_connectapi):
@@ -326,7 +350,7 @@ class TestGetActivity:
 
         # Assert
         mock_connectapi.assert_called_once_with(f"/activity-service/activity/{activity_id}")
-        assert result is None
+        assert result == {"activity": None}
 
     @patch('garmin_workouts_mcp.main.garth.connectapi')
     def test_get_activity_api_error(self, mock_connectapi):
@@ -562,9 +586,9 @@ class TestGetActivityWeather:
 
         # Assert
         mock_connectapi.assert_called_once_with(f"/activity-service/activity/{activity_id}/weather")
-        assert result == expected_weather
-        assert result["temperature"] == 22.5
-        assert result["weatherCondition"] == "partly_cloudy"
+        assert result == {"weather": expected_weather}
+        assert result["weather"]["temperature"] == 22.5
+        assert result["weather"]["weatherCondition"] == "partly_cloudy"
 
     @patch('garmin_workouts_mcp.main.garth.connectapi')
     def test_get_activity_weather_no_data(self, mock_connectapi):
@@ -582,7 +606,7 @@ class TestGetActivityWeather:
 
         # Assert
         mock_connectapi.assert_called_once_with(f"/activity-service/activity/{activity_id}/weather")
-        assert result is None
+        assert result == {"weather": None}
 
     @patch('garmin_workouts_mcp.main.garth.connectapi')
     def test_get_activity_weather_api_error(self, mock_connectapi):
@@ -617,7 +641,7 @@ class TestGetActivityWeather:
 
         # Assert
         mock_connectapi.assert_called_once_with(f"/activity-service/activity/{activity_id}/weather")
-        assert result == {}
+        assert result == {"weather": {}}
 
 
 class TestGenerateWorkoutDataPrompt:
@@ -693,6 +717,15 @@ class TestUploadWorkout:
         with pytest.raises(Exception, match="No workout ID returned"):
             upload_workout_func(workout_data)
 
+    def test_upload_workout_rejects_native_payload_with_guidance(self):
+        import garmin_workouts_mcp.main as main_module
+
+        upload_workout_func = main_module.upload_workout.fn
+        native_workout = _native_strength_workout_payload()
+
+        with pytest.raises(ValueError, match="use upload_strength_workout"):
+            upload_workout_func(native_workout)
+
 
 class TestStrengthWorkoutTools:
     """Test cases for build_strength_workout and upload_strength_workout tools."""
@@ -761,6 +794,53 @@ class TestStrengthWorkoutTools:
 
     @patch("garmin_workouts_mcp.main.prepare_strength_workout_payload")
     @patch("garmin_workouts_mcp.main.garth.connectapi")
+    def test_upload_strength_workout_replace_existing_exact_name(self, mock_connectapi, mock_prepare):
+        import garmin_workouts_mcp.main as main_module
+
+        upload_strength_workout_func = main_module.upload_strength_workout.fn
+        workout_data = _native_strength_workout_payload()
+        normalized_payload = _native_strength_workout_payload()
+
+        mock_prepare.return_value = normalized_payload
+        mock_connectapi.side_effect = [
+            [
+                {"workoutId": "old_1", "workoutName": "Strength Test"},
+                {"workoutId": "other_1", "workoutName": "Another Workout"},
+            ],
+            {},
+            {"workoutId": "new_123"},
+        ]
+
+        result = upload_strength_workout_func(
+            workout_data,
+            replace_existing=True,
+            name_match_mode="exact",
+        )
+
+        assert result == {"workoutId": "new_123", "replacedWorkoutIds": ["old_1"]}
+        assert mock_connectapi.call_count == 3
+        assert mock_connectapi.call_args_list[0].args == ("/workout-service/workouts",)
+        assert mock_connectapi.call_args_list[1].args == ("/workout-service/workout/old_1",)
+        assert mock_connectapi.call_args_list[1].kwargs == {"method": "DELETE"}
+        assert mock_connectapi.call_args_list[2].args == ("/workout-service/workout",)
+        assert mock_connectapi.call_args_list[2].kwargs == {"method": "POST", "json": normalized_payload}
+
+    @patch("garmin_workouts_mcp.main.prepare_strength_workout_payload")
+    @patch("garmin_workouts_mcp.main.garth.connectapi")
+    def test_upload_strength_workout_replace_existing_invalid_match_mode(self, mock_connectapi, mock_prepare):
+        import garmin_workouts_mcp.main as main_module
+
+        upload_strength_workout_func = main_module.upload_strength_workout.fn
+        workout_data = _native_strength_workout_payload()
+        mock_prepare.return_value = workout_data
+
+        with pytest.raises(ValueError, match="name_match_mode"):
+            upload_strength_workout_func(workout_data, replace_existing=True, name_match_mode="invalid")
+
+        mock_connectapi.assert_not_called()
+
+    @patch("garmin_workouts_mcp.main.prepare_strength_workout_payload")
+    @patch("garmin_workouts_mcp.main.garth.connectapi")
     def test_upload_strength_workout_no_workout_id(self, mock_connectapi, mock_prepare):
         import garmin_workouts_mcp.main as main_module
 
@@ -792,6 +872,97 @@ class TestStrengthWorkoutTools:
 
         with pytest.raises(Exception, match="Exercise CSV file not found"):
             upload_strength_workout_func(workout_data)
+
+    @patch("garmin_workouts_mcp.main.prepare_strength_workout_payload")
+    @patch("garmin_workouts_mcp.main.garth.connectapi")
+    def test_upload_strength_workout_accepts_build_wrapper(self, mock_connectapi, mock_prepare):
+        import garmin_workouts_mcp.main as main_module
+
+        upload_strength_workout_func = main_module.upload_strength_workout.fn
+        native_workout = _native_strength_workout_payload()
+
+        mock_prepare.return_value = native_workout
+        mock_connectapi.return_value = {"workoutId": "wrapped_123"}
+
+        result = upload_strength_workout_func({"workout": native_workout})
+
+        mock_prepare.assert_called_once_with(native_workout)
+        assert result == {"workoutId": "wrapped_123"}
+
+    @patch("garmin_workouts_mcp.main.prepare_strength_workout_payload")
+    @patch("garmin_workouts_mcp.main.garth.connectapi")
+    def test_upload_strength_workout_http_error_includes_status_and_body(self, mock_connectapi, mock_prepare):
+        import garmin_workouts_mcp.main as main_module
+
+        upload_strength_workout_func = main_module.upload_strength_workout.fn
+        workout_data = _native_strength_workout_payload()
+
+        mock_prepare.return_value = workout_data
+        mock_connectapi.side_effect = _FakeGarthHTTPError(
+            _FakeResponse(status_code=400, json_body={"error": "Invalid category"})
+        )
+
+        with pytest.raises(Exception, match="status=400"):
+            upload_strength_workout_func(workout_data)
+
+    @patch("garmin_workouts_mcp.main.prepare_strength_workout_payload")
+    @patch("garmin_workouts_mcp.main.garth.connectapi")
+    def test_upload_strength_workout_invalid_category_guidance_when_no_remap_available(
+        self,
+        mock_connectapi,
+        mock_prepare,
+    ):
+        import garmin_workouts_mcp.main as main_module
+
+        upload_strength_workout_func = main_module.upload_strength_workout.fn
+        workout_data = _native_strength_workout_payload()
+        step = workout_data["workoutSegments"][0]["workoutSteps"][0]
+        step["stepType"] = {"stepTypeId": 3, "stepTypeKey": "interval"}
+        step["endCondition"] = {"conditionTypeId": 10, "conditionTypeKey": "reps"}
+        step["endConditionValue"] = 10.0
+        step["category"] = "PLANK_SIDE"
+        step["exerciseName"] = "PLANK"
+
+        mock_prepare.return_value = workout_data
+        mock_connectapi.side_effect = _FakeGarthHTTPError(
+            _FakeResponse(status_code=400, json_body={"message": "Invalid category"})
+        )
+
+        with pytest.raises(Exception, match="GARMIN_STRENGTH_CATEGORY_MAPPING"):
+            upload_strength_workout_func(workout_data)
+
+        assert mock_connectapi.call_count == 1
+
+    @patch("garmin_workouts_mcp.main.prepare_strength_workout_payload")
+    @patch("garmin_workouts_mcp.main.garth.connectapi")
+    def test_upload_strength_workout_retries_with_category_remap_on_invalid_category(
+        self,
+        mock_connectapi,
+        mock_prepare,
+    ):
+        import garmin_workouts_mcp.main as main_module
+
+        upload_strength_workout_func = main_module.upload_strength_workout.fn
+        workout_data = _native_strength_workout_payload()
+        workout_data["workoutSegments"][0]["workoutSteps"][0]["category"] = "ROW_FACE"
+        workout_data["workoutSegments"][0]["workoutSteps"][0]["exerciseName"] = "PULL_WITH_EXTERNAL_ROTATION"
+
+        mock_prepare.return_value = workout_data
+        mock_connectapi.side_effect = [
+            _FakeGarthHTTPError(_FakeResponse(status_code=400, json_body={"message": "Invalid category"})),
+            {"workoutId": "mapped_123"},
+        ]
+
+        result = upload_strength_workout_func(workout_data)
+
+        assert result == {
+            "workoutId": "mapped_123",
+            "categoryRemaps": {
+                "categories": {"ROW_FACE": "ROW"},
+                "exercises": {"ROW_FACE/PULL_WITH_EXTERNAL_ROTATION": "FACE_PULL_WITH_EXTERNAL_ROTATION"},
+            },
+        }
+        assert mock_connectapi.call_count == 2
 
 
 class TestGetCalendar:
@@ -921,6 +1092,17 @@ class TestGetCalendar:
         # Test day too high
         with pytest.raises(ValueError, match="Day must be between 1 and 31, got 32"):
             get_calendar_func(2025, 6, 32)
+
+    def test_get_calendar_impossible_date(self):
+        """Test get_calendar with a syntactically valid but calendar-impossible date."""
+        import garmin_workouts_mcp.main as main_module
+        get_calendar_func = main_module.get_calendar.fn
+
+        with pytest.raises(ValueError, match="Invalid date: 2025-02-30"):
+            get_calendar_func(2025, 2, 30)
+
+        with pytest.raises(ValueError, match="Invalid date: 2025-04-31"):
+            get_calendar_func(2025, 4, 31)
 
     @patch('garmin_workouts_mcp.main.garth.connectapi')
     def test_get_calendar_empty_response(self, mock_connectapi):

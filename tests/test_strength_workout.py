@@ -6,8 +6,12 @@ from garmin_workouts_mcp.strength_workout import (
     build_strength_step,
     build_strength_workout_from_simple,
     build_strength_workout_native,
+    get_strength_category_mapping,
+    get_strength_exercise_mapping,
     normalize_strength_workout,
     prepare_strength_workout_payload,
+    remap_strength_exercises,
+    remap_strength_categories,
     validate_strength_exercise_pairs,
     validate_strength_root_structure,
 )
@@ -148,6 +152,45 @@ def test_validate_strength_exercise_pairs_category_without_exercise(tmp_path):
         validate_strength_exercise_pairs(workout, csv_path=csv_path)
 
 
+def test_validate_strength_exercise_pairs_self_keyed_category_row(tmp_path):
+    workout = {
+        "workoutName": "Plank Test",
+        "sportType": {"sportTypeId": 5, "sportTypeKey": "strength_training"},
+        "workoutSegments": [
+            {
+                "segmentOrder": 1,
+                "sportType": {"sportTypeId": 5, "sportTypeKey": "strength_training"},
+                "workoutSteps": [
+                    {
+                        "type": "ExecutableStepDTO",
+                        "stepType": {"stepTypeId": 3, "stepTypeKey": "interval"},
+                        "endCondition": {"conditionTypeId": 10, "conditionTypeKey": "reps"},
+                        "endConditionValue": 30.0,
+                        "targetType": {"workoutTargetTypeId": 1, "workoutTargetTypeKey": "no.target"},
+                        "category": "PLANK_PLANK",
+                        "exerciseName": "PLANK",
+                        "weightValue": -1.0,
+                        "weightUnit": {"unitId": 8, "unitKey": "kilogram", "factor": 1000.0},
+                    }
+                ],
+            }
+        ],
+    }
+
+    csv_path = tmp_path / "exercise_keys.csv"
+    csv_path.write_text(
+        "\n".join(
+            [
+                "key,category,language_en,name_en,language_fr,name_fr",
+                "PLANK_PLANK,PLANK_PLANK,en,Plank,fr,Planche",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    validate_strength_exercise_pairs(workout, csv_path=str(csv_path))
+
+
 def test_normalize_strength_workout_assigns_orders_and_child_ids():
     workout = _make_native_strength_workout()
     normalized = normalize_strength_workout(workout)
@@ -169,6 +212,90 @@ def test_normalize_strength_workout_assigns_orders_and_child_ids():
 
     assert second_segment_steps[0]["stepOrder"] == 5
     assert first_segment_steps[0]["stepId"] is None
+
+
+def test_remap_strength_categories_applies_known_mappings():
+    workout = _make_native_strength_workout()
+    workout["workoutSegments"][0]["workoutSteps"][0]["category"] = "ROW_FACE"
+    workout["workoutSegments"][0]["workoutSteps"][0]["exerciseName"] = "PULL"
+
+    remapped, applied = remap_strength_categories(workout)
+
+    assert workout["workoutSegments"][0]["workoutSteps"][0]["category"] == "ROW_FACE"
+    assert remapped["workoutSegments"][0]["workoutSteps"][0]["category"] == "ROW"
+    assert applied == {"ROW_FACE": "ROW"}
+
+
+def test_get_strength_category_mapping_with_env_override(monkeypatch):
+    monkeypatch.setenv(
+        "GARMIN_STRENGTH_CATEGORY_MAPPING",
+        "ROW_FACE:ROW,FLYE_DUMBBELL:FLYE_ALT",
+    )
+
+    mapping = get_strength_category_mapping()
+
+    assert mapping["ROW_FACE"] == "ROW"
+    assert mapping["FLYE_DUMBBELL"] == "FLYE_ALT"
+
+
+def test_get_strength_category_mapping_with_file_override(tmp_path, monkeypatch):
+    mapping_path = tmp_path / "strength_mapping.json"
+    mapping_path.write_text(
+        (
+            "{"
+            '"categoryMapping":{"ROW_FACE":"ROW_ALT"},'
+            '"exerciseMapping":{"ROW_FACE/PULL":"FACE_PULL_ALT"}'
+            "}"
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("GARMIN_STRENGTH_MAPPING_FILE", str(mapping_path))
+
+    mapping = get_strength_category_mapping()
+
+    assert mapping["ROW_FACE"] == "ROW_ALT"
+
+
+def test_get_strength_exercise_mapping_with_env_override(monkeypatch):
+    monkeypatch.setenv(
+        "GARMIN_STRENGTH_EXERCISE_MAPPING",
+        "ROW_FACE/PULL:FACE_PULL_ALT",
+    )
+
+    mapping = get_strength_exercise_mapping()
+
+    assert mapping[("ROW_FACE", "PULL")] == "FACE_PULL_ALT"
+
+
+def test_get_strength_exercise_mapping_invalid_env_entry(monkeypatch):
+    monkeypatch.setenv("GARMIN_STRENGTH_EXERCISE_MAPPING", "BROKEN_ENTRY")
+
+    with pytest.raises(ValueError, match="GARMIN_STRENGTH_EXERCISE_MAPPING"):
+        get_strength_exercise_mapping()
+
+
+def test_remap_strength_exercises_applies_known_mappings():
+    workout = _make_native_strength_workout()
+    workout["workoutSegments"][0]["workoutSteps"][0]["category"] = "ROW_FACE"
+    workout["workoutSegments"][0]["workoutSteps"][0]["exerciseName"] = "PULL_WITH_EXTERNAL_ROTATION"
+
+    remapped, applied = remap_strength_exercises(workout)
+
+    assert workout["workoutSegments"][0]["workoutSteps"][0]["exerciseName"] == "PULL_WITH_EXTERNAL_ROTATION"
+    assert remapped["workoutSegments"][0]["workoutSteps"][0]["exerciseName"] == "FACE_PULL_WITH_EXTERNAL_ROTATION"
+    assert applied == {"ROW_FACE/PULL_WITH_EXTERNAL_ROTATION": "FACE_PULL_WITH_EXTERNAL_ROTATION"}
+
+
+def test_remap_strength_exercises_maps_ez_bar_biceps_to_standing_variant():
+    workout = _make_native_strength_workout()
+    workout["workoutSegments"][0]["workoutSteps"][0]["category"] = "CURL_STANDING"
+    workout["workoutSegments"][0]["workoutSteps"][0]["exerciseName"] = "EZ_BAR_BICEPS_CURL"
+
+    remapped, applied = remap_strength_exercises(workout)
+
+    assert workout["workoutSegments"][0]["workoutSteps"][0]["exerciseName"] == "EZ_BAR_BICEPS_CURL"
+    assert remapped["workoutSegments"][0]["workoutSteps"][0]["exerciseName"] == "STANDING_EZ_BAR_BICEPS_CURL"
+    assert applied == {"CURL_STANDING/EZ_BAR_BICEPS_CURL": "STANDING_EZ_BAR_BICEPS_CURL"}
 
 
 def test_build_strength_step_with_reps():

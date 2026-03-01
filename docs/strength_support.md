@@ -106,6 +106,10 @@ Return shape:
 ## Tool: `upload_strength_workout`
 
 Input: Garmin native strength JSON.  
+Optional flags:
+- `replace_existing` (bool, default `false`)
+- `name_match_mode` (`exact` or `contains`, default `exact`)
+
 Output:
 
 ```json
@@ -118,7 +122,34 @@ Behavior:
 2. Normalize numbering
 3. Validate `(category, exerciseName)` pairs against CSV
 4. Upload to Garmin Connect
-5. Return `workoutId`
+5. If Garmin responds with `400 Invalid category`, retry once with conservative category remapping
+6. Return `workoutId` (and `categoryRemaps` when retry remapping was applied)
+7. If `replace_existing=true`, delete matching workouts by name first and return `replacedWorkoutIds`
+
+Default remaps used for retry:
+
+- `ROW_FACE -> ROW`
+- `FLYE_DUMBBELL -> FLYE`
+- `CURL_DUMBBELL -> CURL`
+- `SHRUG_SCAPULAR -> SHRUG`
+- `PLANK_PLANK -> PLANK`
+
+Exercise remaps used on retry (selected examples):
+
+- `ROW/PULL_WITH_EXTERNAL_ROTATION -> FACE_PULL_WITH_EXTERNAL_ROTATION`
+- `SHRUG/RETRACTION -> SCAPULAR_RETRACTION`
+- `CURL/REVERSE_WRIST_CURL -> DUMBBELL_REVERSE_WRIST_CURL`
+- `FLYE/FLYE -> DUMBBELL_FLYE`
+
+You can override/extend remaps with:
+
+- `GARMIN_STRENGTH_CATEGORY_MAPPING=SOURCE:TARGET,SOURCE2:TARGET2`
+- `GARMIN_STRENGTH_EXERCISE_MAPPING=CATEGORY/EXERCISE:TARGET_EXERCISE,...`
+
+Mappings are versioned in:
+
+- `config/strength_mapping.json`
+- Override file path with `GARMIN_STRENGTH_MAPPING_FILE=/abs/path/strength_mapping.json`
 
 ## Supported Rest Patterns
 

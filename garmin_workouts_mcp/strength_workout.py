@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import copy
 import csv
+import json
 import os
 from functools import lru_cache
 from pathlib import Path
-from typing import Any
+from typing import Any, Mapping
 
 
 STRENGTH_SPORT_TYPE = {
@@ -40,7 +41,115 @@ END_CONDITION_MAPPING = {
 
 DEFAULT_CSV_FILENAME = "garmin_exercises_keys_en_fr.csv"
 CSV_ENV_NAME = "GARMIN_STRENGTH_EXERCISES_CSV"
+CATEGORY_MAPPING_ENV_NAME = "GARMIN_STRENGTH_CATEGORY_MAPPING"
+EXERCISE_MAPPING_ENV_NAME = "GARMIN_STRENGTH_EXERCISE_MAPPING"
+MAPPING_FILE_ENV_NAME = "GARMIN_STRENGTH_MAPPING_FILE"
+DEFAULT_MAPPING_FILENAME = "config/strength_mapping.json"
 SUPPORTED_STRENGTH_STEP_TYPES = {"ExecutableStepDTO", "RepeatGroupDTO"}
+
+DEFAULT_STRENGTH_CATEGORY_MAPPING = {
+    "ROW_FACE": "ROW",
+    "ROW_BENT": "ROW",
+    "ROW_DUMBBELL": "ROW",
+    "FLYE_DUMBBELL": "FLYE",
+    "FLYE_INCLINE": "FLYE",
+    "CURL_DUMBBELL": "CURL",
+    "CURL_STANDING": "CURL",
+    "SHRUG_SCAPULAR": "SHRUG",
+    "PLANK_PLANK": "PLANK",
+    "SQUAT_WEIGHTED": "SQUAT",
+    "DEADLIFT_ROMANIAN": "DEADLIFT",
+    "LUNGE_WEIGHTED": "LUNGE",
+}
+
+DEFAULT_STRENGTH_EXERCISE_MAPPING = {
+    ("ROW", "PULL"): "FACE_PULL",
+    ("ROW", "PULL_WITH_EXTERNAL_ROTATION"): "FACE_PULL_WITH_EXTERNAL_ROTATION",
+    ("ROW", "OVER_ROW_WITH_BARBELL"): "BENT_OVER_ROW_WITH_BARBELL",
+    ("ROW", "ROW"): "DUMBBELL_ROW",
+    ("SHRUG", "RETRACTION"): "SCAPULAR_RETRACTION",
+    ("CURL", "REVERSE_WRIST_CURL"): "DUMBBELL_REVERSE_WRIST_CURL",
+    ("CURL", "HAMMER_CURL"): "DUMBBELL_HAMMER_CURL",
+    ("CURL", "EZ_BAR_BICEPS_CURL"): "STANDING_EZ_BAR_BICEPS_CURL",
+    ("FLYE", "FLYE"): "DUMBBELL_FLYE",
+    ("FLYE", "REVERSE_FLYE"): "INCLINE_REVERSE_FLYE",
+    ("SQUAT", "SQUAT"): "WEIGHTED_SQUAT",
+    ("DEADLIFT", "DEADLIFT"): "ROMANIAN_DEADLIFT",
+    ("LUNGE", "LUNGE"): "WEIGHTED_LUNGE",
+    ("ROW_BENT", "OVER_ROW_WITH_BARBELL"): "BENT_OVER_ROW_WITH_BARBELL",
+    ("ROW_DUMBBELL", "ROW"): "DUMBBELL_ROW",
+    ("CURL_DUMBBELL", "HAMMER_CURL"): "DUMBBELL_HAMMER_CURL",
+    ("CURL_STANDING", "EZ_BAR_BICEPS_CURL"): "STANDING_EZ_BAR_BICEPS_CURL",
+    ("FLYE_INCLINE", "REVERSE_FLYE"): "INCLINE_REVERSE_FLYE",
+    ("SQUAT_WEIGHTED", "SQUAT"): "WEIGHTED_SQUAT",
+    ("DEADLIFT_ROMANIAN", "DEADLIFT"): "ROMANIAN_DEADLIFT",
+    ("LUNGE_WEIGHTED", "LUNGE"): "WEIGHTED_LUNGE",
+    ("ROW_FACE", "PULL"): "FACE_PULL",
+    ("ROW_FACE", "PULL_WITH_EXTERNAL_ROTATION"): "FACE_PULL_WITH_EXTERNAL_ROTATION",
+    ("SHRUG_SCAPULAR", "RETRACTION"): "SCAPULAR_RETRACTION",
+    ("CURL_DUMBBELL", "REVERSE_WRIST_CURL"): "DUMBBELL_REVERSE_WRIST_CURL",
+    ("FLYE_DUMBBELL", "FLYE"): "DUMBBELL_FLYE",
+}
+
+
+def _resolve_strength_mapping_path(mapping_path: str | None = None) -> Path | None:
+    if mapping_path:
+        path = Path(mapping_path).expanduser()
+    elif os.environ.get(MAPPING_FILE_ENV_NAME):
+        path = Path(os.environ[MAPPING_FILE_ENV_NAME]).expanduser()
+    else:
+        repo_root = Path(__file__).resolve().parent.parent
+        path = repo_root / DEFAULT_MAPPING_FILENAME
+
+    if not path.exists() or not path.is_file():
+        return None
+    return path
+
+
+@lru_cache(maxsize=4)
+def _load_strength_mappings_from_file(
+    mapping_path: str,
+) -> tuple[dict[str, str], dict[tuple[str, str], str]]:
+    with open(mapping_path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+
+    if not isinstance(data, dict):
+        raise ValueError("Strength mapping file must be a JSON object.")
+
+    raw_categories = data.get("categoryMapping", {})
+    raw_exercises = data.get("exerciseMapping", {})
+
+    if not isinstance(raw_categories, dict):
+        raise ValueError("strength mapping file key 'categoryMapping' must be an object.")
+    if not isinstance(raw_exercises, dict):
+        raise ValueError("strength mapping file key 'exerciseMapping' must be an object.")
+
+    category_mapping: dict[str, str] = {}
+    exercise_mapping: dict[tuple[str, str], str] = {}
+
+    for source, target in raw_categories.items():
+        source_key = _normalize_optional_string(source)
+        target_key = _normalize_optional_string(target)
+        if not source_key or not target_key:
+            continue
+        category_mapping[source_key] = target_key
+
+    for source_pair, target in raw_exercises.items():
+        source_pair_key = _normalize_optional_string(source_pair)
+        target_key = _normalize_optional_string(target)
+        if not source_pair_key or not target_key:
+            continue
+        source_category, separator, source_exercise = source_pair_key.partition("/")
+        source_category = source_category.strip()
+        source_exercise = source_exercise.strip()
+        if separator != "/" or not source_category or not source_exercise:
+            raise ValueError(
+                "Invalid exerciseMapping key in strength mapping file. "
+                "Use format 'CATEGORY/EXERCISE_NAME'."
+            )
+        exercise_mapping[(source_category, source_exercise)] = target_key
+
+    return category_mapping, exercise_mapping
 
 
 def build_strength_step(
@@ -383,6 +492,151 @@ def _normalize_optional_string(value: Any) -> str | None:
     return str(value)
 
 
+def get_strength_category_mapping(
+    mapping: Mapping[str, str] | None = None,
+) -> dict[str, str]:
+    """
+    Build category mapping used to improve Garmin write-API compatibility.
+    """
+    resolved_mapping = dict(DEFAULT_STRENGTH_CATEGORY_MAPPING)
+
+    mapping_path = _resolve_strength_mapping_path()
+    if mapping_path is not None:
+        file_category_mapping, _ = _load_strength_mappings_from_file(str(mapping_path))
+        resolved_mapping.update(file_category_mapping)
+
+    env_mapping = os.environ.get(CATEGORY_MAPPING_ENV_NAME, "").strip()
+    if env_mapping:
+        for entry in env_mapping.split(","):
+            pair = entry.strip()
+            if not pair:
+                continue
+            source, separator, target = pair.partition(":")
+            source = source.strip()
+            target = target.strip()
+            if separator != ":" or not source or not target:
+                raise ValueError(
+                    f"Invalid {CATEGORY_MAPPING_ENV_NAME} entry '{entry}'. "
+                    "Use format 'SOURCE:TARGET,SOURCE2:TARGET2'."
+                )
+            resolved_mapping[source] = target
+
+    if mapping:
+        for source, target in mapping.items():
+            source_key = _normalize_optional_string(source)
+            target_key = _normalize_optional_string(target)
+            if not source_key or not target_key:
+                continue
+            resolved_mapping[source_key] = target_key
+
+    return resolved_mapping
+
+
+def get_strength_exercise_mapping(
+    mapping: Mapping[tuple[str, str], str] | None = None,
+) -> dict[tuple[str, str], str]:
+    """
+    Build exercise-name mapping used to improve Garmin write-API compatibility.
+    """
+    resolved_mapping = dict(DEFAULT_STRENGTH_EXERCISE_MAPPING)
+
+    mapping_path = _resolve_strength_mapping_path()
+    if mapping_path is not None:
+        _, file_exercise_mapping = _load_strength_mappings_from_file(str(mapping_path))
+        resolved_mapping.update(file_exercise_mapping)
+
+    env_mapping = os.environ.get(EXERCISE_MAPPING_ENV_NAME, "").strip()
+    if env_mapping:
+        for entry in env_mapping.split(","):
+            pair = entry.strip()
+            if not pair:
+                continue
+            source_pair, separator, target = pair.partition(":")
+            source_pair = source_pair.strip()
+            target = target.strip()
+            source_category, category_separator, source_exercise = source_pair.partition("/")
+            source_category = source_category.strip()
+            source_exercise = source_exercise.strip()
+            if (
+                separator != ":"
+                or category_separator != "/"
+                or not source_category
+                or not source_exercise
+                or not target
+            ):
+                raise ValueError(
+                    f"Invalid {EXERCISE_MAPPING_ENV_NAME} entry '{entry}'. "
+                    "Use format 'CATEGORY/EXERCISE:TARGET,CATEGORY2/EXERCISE2:TARGET2'."
+                )
+            resolved_mapping[(source_category, source_exercise)] = target
+
+    if mapping:
+        for key, value in mapping.items():
+            if not isinstance(key, tuple) or len(key) != 2:
+                continue
+            source_category = _normalize_optional_string(key[0])
+            source_exercise = _normalize_optional_string(key[1])
+            target_exercise = _normalize_optional_string(value)
+            if not source_category or not source_exercise or not target_exercise:
+                continue
+            resolved_mapping[(source_category, source_exercise)] = target_exercise
+
+    return resolved_mapping
+
+
+def remap_strength_categories(
+    workout_data: dict[str, Any],
+    mapping: Mapping[str, str] | None = None,
+) -> tuple[dict[str, Any], dict[str, str]]:
+    """
+    Return a deep-copied workout with remapped categories and the applied map.
+    """
+    resolved_mapping = get_strength_category_mapping(mapping=mapping)
+    remapped_workout = copy.deepcopy(workout_data)
+    applied_mappings: dict[str, str] = {}
+
+    for step in _iter_executable_steps(remapped_workout):
+        category = _normalize_optional_string(step.get("category"))
+        if category is None:
+            continue
+        remapped_category = resolved_mapping.get(category)
+        if remapped_category is None or remapped_category == category:
+            continue
+        step["category"] = remapped_category
+        applied_mappings[category] = remapped_category
+
+    return remapped_workout, applied_mappings
+
+
+def remap_strength_exercises(
+    workout_data: dict[str, Any],
+    mapping: Mapping[tuple[str, str], str] | None = None,
+) -> tuple[dict[str, Any], dict[str, str]]:
+    """
+    Return a deep-copied workout with remapped exercise names and applied map.
+    """
+    resolved_mapping = get_strength_exercise_mapping(mapping=mapping)
+
+    remapped_workout = copy.deepcopy(workout_data)
+    applied_mappings: dict[str, str] = {}
+
+    for step in _iter_executable_steps(remapped_workout):
+        category = _normalize_optional_string(step.get("category"))
+        exercise_name = _normalize_optional_string(step.get("exerciseName"))
+        if category is None or exercise_name is None:
+            continue
+
+        source_key = (category, exercise_name)
+        remapped_exercise = resolved_mapping.get(source_key)
+        if remapped_exercise is None or remapped_exercise == exercise_name:
+            continue
+
+        step["exerciseName"] = remapped_exercise
+        applied_mappings[f"{category}/{exercise_name}"] = remapped_exercise
+
+    return remapped_workout, applied_mappings
+
+
 def _resolve_exercise_csv_path(csv_path: str | None = None) -> Path:
     if csv_path:
         path = Path(csv_path).expanduser()
@@ -423,14 +677,22 @@ def _load_exercise_pairs(csv_path: str) -> set[tuple[str, str]]:
                     continue
 
                 expected_prefix = f"{category}_"
-                if not key.startswith(expected_prefix):
+                if key.startswith(expected_prefix):
+                    # Garmin key format is CATEGORY_EXERCISE_NAME. The API payload
+                    # requires category + exerciseName separately.
+                    exercise_name = key[len(expected_prefix):].strip()
+                    if exercise_name:
+                        exercise_pairs.add((category, exercise_name))
                     continue
 
-                # Garmin key format is CATEGORY_EXERCISE_NAME. The API payload
-                # requires category + exerciseName separately.
-                exercise_name = key[len(expected_prefix):].strip()
-                if exercise_name:
-                    exercise_pairs.add((category, exercise_name))
+                if key == category:
+                    # Some rows are self-keyed (e.g. PLANK_PLANK,PLANK_PLANK).
+                    # Accept both the full key and the trailing token form so
+                    # native Garmin payloads like PLANK_PLANK/PLANK are not rejected.
+                    exercise_pairs.add((category, category))
+                    trailing_token = category.rsplit("_", 1)[-1].strip()
+                    if trailing_token:
+                        exercise_pairs.add((category, trailing_token))
 
             if not exercise_pairs:
                 raise ValueError("Exercise CSV did not yield any valid (category, exerciseName) pairs.")

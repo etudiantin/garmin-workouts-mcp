@@ -85,6 +85,33 @@ To log in out-of-band:
 
     The MCP server will automatically look for these saved tokens. If you wish to store them in a custom location, you can set the `GARTH_HOME` environment variable.
 
+### 3. Persistent Debug Session (Recommended)
+
+For long debug sessions, use the helper script to log in once and keep reusing the same token directory until you explicitly close it.
+
+```bash
+scripts/garth_session.sh login
+scripts/garth_session.sh check
+scripts/garth_session.sh run .venv/bin/python -c 'from garmin_workouts_mcp.main import login; login(); print("OK")'
+```
+
+Default token directory used by this helper:
+
+- `~/.garth-debug-garmin`
+
+You can override it:
+
+```bash
+export GARTH_HOME="$HOME/.garth-debug-garmin"
+scripts/garth_session.sh login
+```
+
+When you want to explicitly close the session:
+
+```bash
+scripts/garth_session.sh close
+```
+
 ## Usage
 
 This server provides the following MCP tools that can be used through any MCP-compatible client:
@@ -133,6 +160,7 @@ Use the `upload_strength_workout` tool to upload native Garmin strength JSON dir
 
 ```
 upload_strength_workout(native_strength_workout_json)
+upload_strength_workout(native_strength_workout_json, replace_existing=True, name_match_mode="exact")
 ```
 
 This preserves strength-specific metadata such as:
@@ -142,6 +170,28 @@ This preserves strength-specific metadata such as:
 - `weightUnit`
 - `endCondition` (including `reps`, `time`, and `lap.button`)
 - `RepeatGroupDTO` structure
+
+Write-API compatibility fallback:
+- The tool first uploads your payload as-is.
+- If Garmin returns `Invalid category` (`400`), the server retries once with a conservative category remap.
+- Current default remaps:
+  - `ROW_FACE -> ROW`
+  - `FLYE_DUMBBELL -> FLYE`
+  - `CURL_DUMBBELL -> CURL`
+  - `SHRUG_SCAPULAR -> SHRUG`
+  - `PLANK_PLANK -> PLANK`
+- Exercise remaps are also applied on retry when needed (e.g. `ROW/PULL_WITH_EXTERNAL_ROTATION -> FACE_PULL_WITH_EXTERNAL_ROTATION`).
+- You can override or extend remaps with:
+  - `GARMIN_STRENGTH_CATEGORY_MAPPING=SOURCE:TARGET,SOURCE2:TARGET2`
+  - `GARMIN_STRENGTH_EXERCISE_MAPPING=CATEGORY/EXERCISE:TARGET_EXERCISE,...`
+- You can externalize mappings in:
+  - `config/strength_mapping.json`
+  - override path via `GARMIN_STRENGTH_MAPPING_FILE=/abs/path/strength_mapping.json`
+- On successful retry, response includes:
+  - `{"workoutId": "...", "categoryRemaps": {...}}`
+- With `replace_existing=True`, matching workouts are deleted before upload:
+  - response includes `replacedWorkoutIds`
+  - `name_match_mode` supports `exact` or `contains`
 
 ### Strength Workflow Quick Guide
 
@@ -224,7 +274,11 @@ Use the `get_activity` tool to retrieve detailed information about a specific ac
 get_activity("activity_id_here")
 ```
 
-Returns comprehensive activity data including distance, duration, pace, heart rate, and more.
+Returns comprehensive activity data including distance, duration, pace, heart rate, and more, wrapped as:
+
+```json
+{"activity": { ... }}
+```
 
 ### Get Activity Weather
 
@@ -234,19 +288,26 @@ Use the `get_activity_weather` tool to get weather conditions during a specific 
 get_activity_weather("activity_id_here")
 ```
 
-Returns weather data including temperature, humidity, wind conditions, and weather descriptions.
+Returns weather data including temperature, humidity, wind conditions, and weather descriptions, wrapped as:
+
+```json
+{"weather": { ... }}
+```
 
 ### Get Calendar Data
 
 Use the `get_calendar` tool to view calendar data with workouts and activities:
 
 ```
-get_calendar(2024, 7)  # Monthly view for July 2024
+get_calendar(2024, 7)      # Monthly view for July 2024
 get_calendar(2024, 7, 15)  # Weekly view including July 15th
 ```
 
+The tool validates that `year`, `month`, and `day` form a real calendar date (e.g., February 30 is rejected).
+
 The tool supports various workout types:
 - **Running**: pace targets, distance/time based intervals
+- **Walking**: pace targets, distance/time based intervals
 - **Cycling**: power, cadence, speed targets
 - **Swimming**: time/distance based sets
 - **Strength training**: circuit-style workouts
@@ -258,6 +319,7 @@ The tool supports various workout types:
 
 - `"30min easy run at conversational pace"`
 - `"5km tempo run at 4:15 min/km pace"`
+- `"45min walk at 8:00 min/km pace"`
 - `"10 min warmup, 3x(20min at 280w, 5min at 150w), 10min cooldown"`
 - `"Swimming: 400m warmup, 8x(50m sprint, 30s rest), 400m cooldown"`
 - `"Strength circuit: 5x(30s pushups, 30s squats, 30s plank, 60s rest)"`
