@@ -167,6 +167,7 @@ cython_debug/
 
 # Garmin credentials
 .garth/
+.garth-debug-garmin/
 ~/.garth/
 
 # OS generated files
@@ -184,3 +185,6 @@ Thumbs.db
 .env.development.local
 .env.test.local
 .env.production.local
+
+# Personal/sensitive local documentation
+docs/securisation-mcp-garmin.md

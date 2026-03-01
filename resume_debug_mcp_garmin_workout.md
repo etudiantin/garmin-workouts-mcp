@@ -292,8 +292,8 @@ La section précédente décrit l'état initial (bugs observés). Après correct
 - En cas d'échec de remap, un message de guidance propose directement des snippets de mapping.
 
 5. **Session Garmin durable**
-- Script `scripts/garth_session.sh` pour conserver une session tant que non fermée (`login/check/run/close`).
 - Utilisation d'un `GARTH_HOME` dédié pour isoler les tokens de debug.
+- Session explicitement fermée en fin de debug (suppression des tokens `oauth1_token.json` / `oauth2_token.json`).
 
 ### Ce qu'on a appris
 

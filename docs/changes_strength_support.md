@@ -120,13 +120,11 @@ This section captures what was validated during live debugging against Garmin Co
 
 ### What we changed to make debugging reliable
 
-- Added `scripts/garth_session.sh` to keep a persistent Garmin auth session with isolated tokens:
-  - `login`, `check`, `run`, `close`
-  - dedicated token home via `GARTH_HOME` (default `~/.garth-debug-garmin`)
 - Updated `scripts/upload_4_weeks_program.py` to:
   - upload with `replace_existing=True` + `name_match_mode="exact"`
   - print `replacedWorkoutIds` and `categoryRemaps`
   - run directly from `scripts/` by injecting repo root into `sys.path`
+- Used an isolated token home for live debug (`GARTH_HOME=~/.garth-debug-garmin`) and explicitly closed/cleaned it after the session.
 
 ### What we learned about Garmin behavior
 

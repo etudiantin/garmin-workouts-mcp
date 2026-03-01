@@ -8,6 +8,7 @@ SPORT_TYPE_MAPPING = {
     "swimming": {"sportTypeId": 4, "sportTypeKey": "swimming", "displayOrder": 5},
     "strength": {"sportTypeId": 5, "sportTypeKey": "strength_training", "displayOrder": 9},
     "cardio": {"sportTypeId": 6, "sportTypeKey": "cardio_training", "displayOrder": 8},
+    "walking": {"sportTypeId": 11, "sportTypeKey": "walking", "displayOrder": 11},
 }
 
 # Step type mapping
@@ -150,7 +151,7 @@ def process_step(step: dict, step_order: int) -> dict:
         An object containing the formatted step and updated stepOrder
     """
     # Handle both stepType and endConditionType for identifying repeat steps
-    if (step.get("numberOfIterations") and step.get("steps") and
+    if (step.get("numberOfIterations") and isinstance(step.get("steps"), list) and
         (step.get("stepType") == "repeat" or step.get("endConditionType") == "repeat")):
         return process_repeat_step(step, step_order)
     elif not step.get("stepType"):
@@ -182,8 +183,11 @@ def process_regular_step(step: dict, step_order: int) -> dict:
     }
 
     # Process end condition (time or distance)
-    if (step.get("endConditionType") == "distance" and
-        step.get("stepDistance") and step.get("distanceUnit")):
+    if step.get("endConditionType") == "distance":
+        if not step.get("stepDistance") or not step.get("distanceUnit"):
+            raise ValueError(
+                f"Missing stepDistance or distanceUnit for distance step: {step.get('stepName', 'Unnamed Step')}"
+            )
         distance_unit = DISTANCE_UNIT_MAPPING.get(step["distanceUnit"].lower())
         if not distance_unit:
             raise ValueError(f"Unsupported distance unit: {step['distanceUnit']}")
@@ -275,7 +279,7 @@ def process_target(workout_step: dict, step: dict) -> None:
 
     workout_step["targetType"] = target_type
 
-    if step["target"].get("value"):
+    if step["target"].get("value") is not None:
         target_values = convert_target_values(step, target_type_key)
         workout_step["targetValueOne"] = target_values["targetValueOne"]
         workout_step["targetValueTwo"] = target_values["targetValueTwo"]

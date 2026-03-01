@@ -85,32 +85,27 @@ To log in out-of-band:
 
     The MCP server will automatically look for these saved tokens. If you wish to store them in a custom location, you can set the `GARTH_HOME` environment variable.
 
-### 3. Persistent Debug Session (Recommended)
+### 3. Optional Custom Token Location
 
-For long debug sessions, use the helper script to log in once and keep reusing the same token directory until you explicitly close it.
-
-```bash
-scripts/garth_session.sh login
-scripts/garth_session.sh check
-scripts/garth_session.sh run .venv/bin/python -c 'from garmin_workouts_mcp.main import login; login(); print("OK")'
-```
-
-Default token directory used by this helper:
-
-- `~/.garth-debug-garmin`
-
-You can override it:
+If you want to isolate tokens for debug sessions, use a dedicated `GARTH_HOME` directory.
 
 ```bash
 export GARTH_HOME="$HOME/.garth-debug-garmin"
-scripts/garth_session.sh login
 ```
 
-When you want to explicitly close the session:
+Then authenticate once with `garth` and save in this directory:
 
-```bash
-scripts/garth_session.sh close
+```python
+import garth
+from getpass import getpass
+
+email = input("Enter email address: ")
+password = getpass("Enter password: ")
+garth.login(email, password)
+garth.save("~/.garth-debug-garmin")
 ```
+
+To explicitly close this session, remove token files in that directory.
 
 ## Usage
 
