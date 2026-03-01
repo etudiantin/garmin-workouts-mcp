@@ -34,10 +34,12 @@ The strength flow applies strict validation before upload:
 - `RepeatGroupDTO.numberOfIterations` must be a positive integer
 - `RepeatGroupDTO.workoutSteps` must be non-empty
 
-3. Exercise pair validation (strict):
+3. Exercise pair validation (strict + compatibility aliases):
 - If both `category` and `exerciseName` are null: accepted (rest/transition steps)
 - If only one is set: rejected
-- If both are set: pair must exist in exercise CSV
+- If both are set: pair must exist in exercise CSV, or match a compatibility alias
+  derived from configured remaps (`GARMIN_STRENGTH_CATEGORY_MAPPING`,
+  `GARMIN_STRENGTH_EXERCISE_MAPPING`, mapping file).
 
 ## CSV Source For Exercise Validation
 

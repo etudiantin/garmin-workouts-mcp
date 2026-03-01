@@ -152,6 +152,47 @@ def test_validate_strength_exercise_pairs_category_without_exercise(tmp_path):
         validate_strength_exercise_pairs(workout, csv_path=csv_path)
 
 
+def test_validate_strength_exercise_pairs_accepts_mapping_compatibility_aliases(tmp_path, monkeypatch):
+    workout = {
+        "workoutSegments": [
+            {
+                "workoutSteps": [
+                    {
+                        "type": "ExecutableStepDTO",
+                        "category": "ALIAS_CAT",
+                        "exerciseName": "ALIAS_EX",
+                    },
+                ]
+            }
+        ]
+    }
+
+    csv_path = tmp_path / "exercise_keys.csv"
+    csv_path.write_text(
+        "\n".join(
+            [
+                "key,category,language_en,name_en,language_fr,name_fr",
+                "BASE_CAT_BASE_EX,BASE_CAT,en,Base Exercise,fr,Test",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="Unknown Garmin exercise pair"):
+        validate_strength_exercise_pairs(workout, csv_path=str(csv_path))
+
+    monkeypatch.setenv(
+        "GARMIN_STRENGTH_CATEGORY_MAPPING",
+        "BASE_CAT:ALIAS_CAT",
+    )
+    monkeypatch.setenv(
+        "GARMIN_STRENGTH_EXERCISE_MAPPING",
+        "BASE_CAT/BASE_EX:ALIAS_EX",
+    )
+
+    validate_strength_exercise_pairs(workout, csv_path=str(csv_path))
+
+
 def test_validate_strength_exercise_pairs_self_keyed_category_row(tmp_path):
     workout = {
         "workoutName": "Plank Test",

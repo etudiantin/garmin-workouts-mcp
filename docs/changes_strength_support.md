@@ -99,6 +99,9 @@ Strength upload now preserves:
 ### `garmin_workouts_mcp/strength_workout.py`
 
 - **CSV parser fix**: Self-keyed rows (`key == category`, e.g. `PLANK_PLANK`) are now handled correctly.
+- **Validation compatibility aliases**: strict pair validation now also accepts remap-derived aliases
+  (same order as upload fallback: exercise remap -> category remap -> exercise remap),
+  which unblocks pairs like `SQUAT/WEIGHTED_SQUAT` and `DEADLIFT/ROMANIAN_DEADLIFT`.
 - **Category remapping utilities**: Added helper functions to resolve and apply write-API category mappings.
 - **Exercise remapping utilities**: Added helper functions and env overrides for pair-level mapping.
 - **External mapping config**: Remaps can be loaded from `garmin_workouts_mcp/config/strength_mapping.json`.

@@ -411,8 +411,14 @@ def prepare_strength_workout_payload(
 def validate_strength_exercise_pairs(workout_data: dict[str, Any], csv_path: str | None = None) -> None:
     """
     Validate that all category/exerciseName pairs are known in the CSV reference.
+
+    In addition to direct CSV pairs, we also accept compatibility aliases
+    produced by the configured category/exercise mappings. This lets callers
+    use normalized write-side pairs (for example `SQUAT/WEIGHTED_SQUAT`)
+    while keeping strict rejection of truly unknown values.
     """
     exercises = _load_exercise_pairs(str(_resolve_exercise_csv_path(csv_path)))
+    compatible_exercises = _build_compatible_exercise_pairs(exercises)
 
     for step in _iter_executable_steps(workout_data):
         category = _normalize_optional_string(step.get("category"))
@@ -424,10 +430,46 @@ def validate_strength_exercise_pairs(workout_data: dict[str, Any], csv_path: str
         if category is None or exercise_name is None:
             raise ValueError("Both category and exerciseName must be set together for exercise steps.")
 
-        if (category, exercise_name) not in exercises:
+        if (category, exercise_name) not in compatible_exercises:
             raise ValueError(
                 f"Unknown Garmin exercise pair category='{category}', exerciseName='{exercise_name}'."
             )
+
+
+def _build_compatible_exercise_pairs(
+    exercise_pairs: set[tuple[str, str]],
+) -> set[tuple[str, str]]:
+    """
+    Extend CSV pairs with compatibility aliases derived from remap settings.
+
+    We mirror the upload fallback order for each known CSV pair:
+    1) exercise remap on source category
+    2) category remap
+    3) exercise remap again on remapped category
+    """
+    compatible_pairs: set[tuple[str, str]] = set(exercise_pairs)
+    category_mapping = get_strength_category_mapping()
+    exercise_mapping = get_strength_exercise_mapping()
+
+    for source_category, source_exercise in exercise_pairs:
+        category = source_category
+        exercise_name = source_exercise
+
+        remapped_exercise = exercise_mapping.get((category, exercise_name))
+        if remapped_exercise:
+            exercise_name = remapped_exercise
+
+        remapped_category = category_mapping.get(category)
+        if remapped_category:
+            category = remapped_category
+
+        remapped_exercise = exercise_mapping.get((category, exercise_name))
+        if remapped_exercise:
+            exercise_name = remapped_exercise
+
+        compatible_pairs.add((category, exercise_name))
+
+    return compatible_pairs
 
 
 def _iter_executable_steps(workout_data: dict[str, Any]):
