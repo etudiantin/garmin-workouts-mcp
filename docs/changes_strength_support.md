@@ -15,8 +15,11 @@ This file summarizes the concrete code changes introduced for complete strength 
 - `docs/strength_support.md`
   - Functional and technical documentation for strength workflows
 
-- `config/strength_mapping.json`
+- `garmin_workouts_mcp/config/strength_mapping.json`
   - Versioned category/exercise remap configuration for Garmin write-API compatibility
+
+- `garmin_workouts_mcp/strength_upload_service.py`
+  - Dedicated service layer for strength upload behavior (idempotent replacement, remap retry, guidance)
 
 ## Modified Files
 
@@ -88,7 +91,7 @@ Strength upload now preserves:
     - `GARMIN_STRENGTH_CATEGORY_MAPPING`
     - `GARMIN_STRENGTH_EXERCISE_MAPPING`
     - `GARMIN_STRENGTH_MAPPING_FILE`
-  - `replace_existing=true` enables idempotent replacement by workout name before upload
+  - `replace_existing=true` enables idempotent replacement by workout name with create-then-delete safety
   - when remap is insufficient, error includes mapping guidance snippets
 
 - **Error detail enrichment**: Upload errors now preserve Garmin HTTP response details (`status` + response body) for faster diagnosis.
@@ -98,7 +101,8 @@ Strength upload now preserves:
 - **CSV parser fix**: Self-keyed rows (`key == category`, e.g. `PLANK_PLANK`) are now handled correctly.
 - **Category remapping utilities**: Added helper functions to resolve and apply write-API category mappings.
 - **Exercise remapping utilities**: Added helper functions and env overrides for pair-level mapping.
-- **External mapping config**: Remaps can be loaded from `config/strength_mapping.json`.
+- **External mapping config**: Remaps can be loaded from `garmin_workouts_mcp/config/strength_mapping.json`.
+- **Mapping source unification**: Default remaps now come from `garmin_workouts_mcp/config/strength_mapping.json` (single source of truth), with env overrides layered on top.
 
 ### `tests/test_main.py`
 
@@ -120,10 +124,6 @@ This section captures what was validated during live debugging against Garmin Co
 
 ### What we changed to make debugging reliable
 
-- Updated `scripts/upload_4_weeks_program.py` to:
-  - upload with `replace_existing=True` + `name_match_mode="exact"`
-  - print `replacedWorkoutIds` and `categoryRemaps`
-  - run directly from `scripts/` by injecting repo root into `sys.path`
 - Used an isolated token home for live debug (`GARTH_HOME=~/.garth-debug-garmin`) and explicitly closed/cleaned it after the session.
 
 ### What we learned about Garmin behavior
@@ -136,7 +136,7 @@ This section captures what was validated during live debugging against Garmin Co
   3. apply exercise remap (original category), then category remap, then exercise remap again
 - Pair-level remaps are required in addition to category remaps (e.g. `ROW_FACE/PULL` -> `FACE_PULL`).
 - Error payload quality matters for fast triage: status/body details and mapping guidance significantly reduce debug time.
-- Idempotent replacement before upload is mandatory for iterative debugging to avoid duplicate workouts.
+- Idempotent replacement with create-then-delete is mandatory for iterative debugging to avoid duplicate workouts without risking pre-delete data loss.
 
 ### Operational validation outcome
 
@@ -144,3 +144,10 @@ This section captures what was validated during live debugging against Garmin Co
 - 12/12 workouts uploaded successfully.
 - `emptyExerciseSteps=0` on all uploaded workouts after read-back checks.
 - Replacement mode deleted previous same-name workouts and returned `replacedWorkoutIds` as expected.
+
+## Production Cleanup (2026-03-01)
+
+- Removed `scripts/upload_4_weeks_program.py` from the production codebase (debug-only helper script).
+- Ensured default mapping file is packaged inside the Python package for wheel/docker deployments:
+  - `garmin_workouts_mcp/config/strength_mapping.json`
+  - declared in `pyproject.toml` via `tool.setuptools.package-data`

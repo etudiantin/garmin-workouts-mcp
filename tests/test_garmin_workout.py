@@ -40,6 +40,14 @@ def test_process_repeat_step_missing_iterations():
     with pytest.raises(ValueError, match="Invalid or missing numberOfIterations for repeat step."):
         process_repeat_step({"numberOfIterations": 0, "steps": []}, 1)
 
+def test_process_step_repeat_missing_iterations_reports_repeat_error():
+    with pytest.raises(ValueError, match="Invalid or missing numberOfIterations for repeat step."):
+        process_step({"stepType": "repeat", "numberOfIterations": 0, "steps": []}, 1)
+
+def test_process_step_repeat_shape_without_step_type_reports_repeat_error():
+    with pytest.raises(ValueError, match="Invalid or missing numberOfIterations for repeat step."):
+        process_step({"numberOfIterations": 0, "steps": []}, 1)
+
 def test_process_target_unsupported_type():
     with pytest.raises(ValueError, match="Unsupported target type: heart_rate_zone"):
         process_target({}, {"target": {"type": "heart_rate_zone"}})
@@ -165,6 +173,16 @@ def test_process_regular_step_unsupported_distance_unit():
         "distanceUnit": "yard"
     }
     with pytest.raises(ValueError, match="Unsupported distance unit: yard"):
+        process_regular_step(step_data, 1)
+
+def test_process_regular_step_invalid_distance_value():
+    step_data = {
+        "stepType": "run",
+        "endConditionType": "distance",
+        "stepDistance": "1",
+        "distanceUnit": "km"
+    }
+    with pytest.raises(ValueError, match="Invalid stepDistance for distance step: Unnamed Step"):
         process_regular_step(step_data, 1)
 
 def test_process_target_speed():

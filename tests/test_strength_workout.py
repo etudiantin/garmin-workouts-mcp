@@ -238,6 +238,12 @@ def test_get_strength_category_mapping_with_env_override(monkeypatch):
     assert mapping["FLYE_DUMBBELL"] == "FLYE_ALT"
 
 
+def test_get_strength_category_mapping_uses_default_file():
+    mapping = get_strength_category_mapping()
+
+    assert mapping["ROW_FACE"] == "ROW"
+
+
 def test_get_strength_category_mapping_with_file_override(tmp_path, monkeypatch):
     mapping_path = tmp_path / "strength_mapping.json"
     mapping_path.write_text(
@@ -265,6 +271,12 @@ def test_get_strength_exercise_mapping_with_env_override(monkeypatch):
     mapping = get_strength_exercise_mapping()
 
     assert mapping[("ROW_FACE", "PULL")] == "FACE_PULL_ALT"
+
+
+def test_get_strength_exercise_mapping_uses_default_file():
+    mapping = get_strength_exercise_mapping()
+
+    assert mapping[("ROW_FACE", "PULL")] == "FACE_PULL"
 
 
 def test_get_strength_exercise_mapping_invalid_env_entry(monkeypatch):

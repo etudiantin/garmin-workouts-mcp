@@ -150,14 +150,20 @@ def process_step(step: dict, step_order: int) -> dict:
     Returns:
         An object containing the formatted step and updated stepOrder
     """
-    # Handle both stepType and endConditionType for identifying repeat steps
-    if (step.get("numberOfIterations") and isinstance(step.get("steps"), list) and
-        (step.get("stepType") == "repeat" or step.get("endConditionType") == "repeat")):
+    step_type = step.get("stepType")
+    end_condition_type = step.get("endConditionType")
+    has_repeat_fields = "numberOfIterations" in step or "steps" in step
+
+    if step_type == "repeat" or end_condition_type == "repeat":
         return process_repeat_step(step, step_order)
-    elif not step.get("stepType"):
+
+    if has_repeat_fields and step_type is None and end_condition_type is None:
+        return process_repeat_step(step, step_order)
+
+    if not step_type:
         raise ValueError(f"Missing stepType for step: {step.get('stepName', 'Unnamed Step')}")
-    else:
-        return process_regular_step(step, step_order)
+
+    return process_regular_step(step, step_order)
 
 
 def process_regular_step(step: dict, step_order: int) -> dict:
@@ -187,6 +193,10 @@ def process_regular_step(step: dict, step_order: int) -> dict:
         if not step.get("stepDistance") or not step.get("distanceUnit"):
             raise ValueError(
                 f"Missing stepDistance or distanceUnit for distance step: {step.get('stepName', 'Unnamed Step')}"
+            )
+        if not isinstance(step.get("stepDistance"), (int, float)) or step["stepDistance"] <= 0:
+            raise ValueError(
+                f"Invalid stepDistance for distance step: {step.get('stepName', 'Unnamed Step')}"
             )
         distance_unit = DISTANCE_UNIT_MAPPING.get(step["distanceUnit"].lower())
         if not distance_unit:

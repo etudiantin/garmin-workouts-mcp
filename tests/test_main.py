@@ -804,11 +804,19 @@ class TestStrengthWorkoutTools:
         mock_prepare.return_value = normalized_payload
         mock_connectapi.side_effect = [
             [
-                {"workoutId": "old_1", "workoutName": "Strength Test"},
-                {"workoutId": "other_1", "workoutName": "Another Workout"},
+                {
+                    "workoutId": "old_1",
+                    "workoutName": "Strength Test",
+                    "sportType": {"sportTypeKey": "strength_training"},
+                },
+                {
+                    "workoutId": "other_1",
+                    "workoutName": "Another Workout",
+                    "sportType": {"sportTypeKey": "strength_training"},
+                },
             ],
-            {},
             {"workoutId": "new_123"},
+            {},
         ]
 
         result = upload_strength_workout_func(
@@ -820,10 +828,111 @@ class TestStrengthWorkoutTools:
         assert result == {"workoutId": "new_123", "replacedWorkoutIds": ["old_1"]}
         assert mock_connectapi.call_count == 3
         assert mock_connectapi.call_args_list[0].args == ("/workout-service/workouts",)
-        assert mock_connectapi.call_args_list[1].args == ("/workout-service/workout/old_1",)
-        assert mock_connectapi.call_args_list[1].kwargs == {"method": "DELETE"}
-        assert mock_connectapi.call_args_list[2].args == ("/workout-service/workout",)
-        assert mock_connectapi.call_args_list[2].kwargs == {"method": "POST", "json": normalized_payload}
+        assert mock_connectapi.call_args_list[1].args == ("/workout-service/workout",)
+        assert mock_connectapi.call_args_list[1].kwargs == {"method": "POST", "json": normalized_payload}
+        assert mock_connectapi.call_args_list[2].args == ("/workout-service/workout/old_1",)
+        assert mock_connectapi.call_args_list[2].kwargs == {"method": "DELETE"}
+
+    @patch("garmin_workouts_mcp.main.prepare_strength_workout_payload")
+    @patch("garmin_workouts_mcp.main.garth.connectapi")
+    def test_upload_strength_workout_replace_existing_filters_non_strength_same_name(
+        self,
+        mock_connectapi,
+        mock_prepare,
+    ):
+        import garmin_workouts_mcp.main as main_module
+
+        upload_strength_workout_func = main_module.upload_strength_workout.fn
+        workout_data = _native_strength_workout_payload()
+
+        mock_prepare.return_value = workout_data
+        mock_connectapi.side_effect = [
+            [
+                {
+                    "workoutId": "old_strength",
+                    "workoutName": "Strength Test",
+                    "sportType": {"sportTypeKey": "strength_training"},
+                },
+                {
+                    "workoutId": "old_running",
+                    "workoutName": "Strength Test",
+                    "sportType": {"sportTypeKey": "running"},
+                },
+            ],
+            {"workoutId": "new_123"},
+            {},
+        ]
+
+        result = upload_strength_workout_func(workout_data, replace_existing=True, name_match_mode="exact")
+
+        assert result == {"workoutId": "new_123", "replacedWorkoutIds": ["old_strength"]}
+        assert mock_connectapi.call_count == 3
+        assert mock_connectapi.call_args_list[2].args == ("/workout-service/workout/old_strength",)
+        assert mock_connectapi.call_args_list[2].kwargs == {"method": "DELETE"}
+
+    @patch("garmin_workouts_mcp.main.prepare_strength_workout_payload")
+    @patch("garmin_workouts_mcp.main.garth.connectapi")
+    def test_upload_strength_workout_replace_existing_does_not_delete_when_create_fails(
+        self,
+        mock_connectapi,
+        mock_prepare,
+    ):
+        import garmin_workouts_mcp.main as main_module
+
+        upload_strength_workout_func = main_module.upload_strength_workout.fn
+        workout_data = _native_strength_workout_payload()
+
+        mock_prepare.return_value = workout_data
+        mock_connectapi.side_effect = [
+            [
+                {
+                    "workoutId": "old_1",
+                    "workoutName": "Strength Test",
+                    "sportType": {"sportTypeKey": "strength_training"},
+                },
+            ],
+            Exception("create failed"),
+        ]
+
+        with pytest.raises(Exception, match="Failed to upload strength workout to Garmin Connect"):
+            upload_strength_workout_func(workout_data, replace_existing=True, name_match_mode="exact")
+
+        assert mock_connectapi.call_count == 2
+        assert mock_connectapi.call_args_list[0].args == ("/workout-service/workouts",)
+        assert mock_connectapi.call_args_list[1].args == ("/workout-service/workout",)
+        assert mock_connectapi.call_args_list[1].kwargs == {"method": "POST", "json": workout_data}
+
+    @patch("garmin_workouts_mcp.main.prepare_strength_workout_payload")
+    @patch("garmin_workouts_mcp.main.garth.connectapi")
+    def test_upload_strength_workout_replace_existing_cleanup_error_reported(
+        self,
+        mock_connectapi,
+        mock_prepare,
+    ):
+        import garmin_workouts_mcp.main as main_module
+
+        upload_strength_workout_func = main_module.upload_strength_workout.fn
+        workout_data = _native_strength_workout_payload()
+
+        mock_prepare.return_value = workout_data
+        mock_connectapi.side_effect = [
+            [
+                {
+                    "workoutId": "old_1",
+                    "workoutName": "Strength Test",
+                    "sportType": {"sportTypeKey": "strength_training"},
+                },
+            ],
+            {"workoutId": "new_123"},
+            Exception("delete failed"),
+        ]
+
+        result = upload_strength_workout_func(workout_data, replace_existing=True, name_match_mode="exact")
+
+        assert result["workoutId"] == "new_123"
+        assert "replacedWorkoutIds" not in result
+        assert "replacementCleanupErrors" in result
+        assert "workoutId=old_1" in result["replacementCleanupErrors"][0]
 
     @patch("garmin_workouts_mcp.main.prepare_strength_workout_payload")
     @patch("garmin_workouts_mcp.main.garth.connectapi")

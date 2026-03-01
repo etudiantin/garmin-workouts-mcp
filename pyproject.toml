@@ -21,4 +21,7 @@ dependencies = [
 garmin-workouts-mcp = "garmin_workouts_mcp.main:main"
 
 [tool.setuptools]
-packages = {find = {exclude = ["src*"]}}
+packages = {find = {exclude = ["src*", "tests*"]}}
+
+[tool.setuptools.package-data]
+garmin_workouts_mcp = ["config/*.json"]

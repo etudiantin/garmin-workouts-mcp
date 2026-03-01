@@ -180,13 +180,14 @@ Write-API compatibility fallback:
   - `GARMIN_STRENGTH_CATEGORY_MAPPING=SOURCE:TARGET,SOURCE2:TARGET2`
   - `GARMIN_STRENGTH_EXERCISE_MAPPING=CATEGORY/EXERCISE:TARGET_EXERCISE,...`
 - You can externalize mappings in:
-  - `config/strength_mapping.json`
+  - `garmin_workouts_mcp/config/strength_mapping.json` (packaged default)
   - override path via `GARMIN_STRENGTH_MAPPING_FILE=/abs/path/strength_mapping.json`
 - On successful retry, response includes:
   - `{"workoutId": "...", "categoryRemaps": {...}}`
-- With `replace_existing=True`, matching workouts are deleted before upload:
+- With `replace_existing=True`, matching **strength** workouts are deleted only after a successful upload:
   - response includes `replacedWorkoutIds`
   - `name_match_mode` supports `exact` or `contains`
+  - if cleanup deletion fails, response includes `replacementCleanupErrors`
 
 ### Strength Workflow Quick Guide
 

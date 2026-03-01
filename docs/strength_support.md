@@ -124,7 +124,8 @@ Behavior:
 4. Upload to Garmin Connect
 5. If Garmin responds with `400 Invalid category`, retry once with conservative category remapping
 6. Return `workoutId` (and `categoryRemaps` when retry remapping was applied)
-7. If `replace_existing=true`, delete matching workouts by name first and return `replacedWorkoutIds`
+7. If `replace_existing=true`, create first, then delete matching strength workouts by name and return `replacedWorkoutIds`
+8. If deletion cleanup has errors, return `replacementCleanupErrors` without losing the newly created workout
 
 Default remaps used for retry:
 
@@ -148,8 +149,9 @@ You can override/extend remaps with:
 
 Mappings are versioned in:
 
-- `config/strength_mapping.json`
+- `garmin_workouts_mcp/config/strength_mapping.json` (packaged default)
 - Override file path with `GARMIN_STRENGTH_MAPPING_FILE=/abs/path/strength_mapping.json`
+- This file is the default source of truth for built-in remaps.
 
 ## Supported Rest Patterns
 

@@ -44,52 +44,10 @@ CSV_ENV_NAME = "GARMIN_STRENGTH_EXERCISES_CSV"
 CATEGORY_MAPPING_ENV_NAME = "GARMIN_STRENGTH_CATEGORY_MAPPING"
 EXERCISE_MAPPING_ENV_NAME = "GARMIN_STRENGTH_EXERCISE_MAPPING"
 MAPPING_FILE_ENV_NAME = "GARMIN_STRENGTH_MAPPING_FILE"
-DEFAULT_MAPPING_FILENAME = "config/strength_mapping.json"
+DEFAULT_MAPPING_FILENAME = "garmin_workouts_mcp/config/strength_mapping.json"
+PACKAGE_MAPPING_FILENAME = "config/strength_mapping.json"
+LEGACY_REPO_MAPPING_FILENAME = "config/strength_mapping.json"
 SUPPORTED_STRENGTH_STEP_TYPES = {"ExecutableStepDTO", "RepeatGroupDTO"}
-
-DEFAULT_STRENGTH_CATEGORY_MAPPING = {
-    "ROW_FACE": "ROW",
-    "ROW_BENT": "ROW",
-    "ROW_DUMBBELL": "ROW",
-    "FLYE_DUMBBELL": "FLYE",
-    "FLYE_INCLINE": "FLYE",
-    "CURL_DUMBBELL": "CURL",
-    "CURL_STANDING": "CURL",
-    "SHRUG_SCAPULAR": "SHRUG",
-    "PLANK_PLANK": "PLANK",
-    "SQUAT_WEIGHTED": "SQUAT",
-    "DEADLIFT_ROMANIAN": "DEADLIFT",
-    "LUNGE_WEIGHTED": "LUNGE",
-}
-
-DEFAULT_STRENGTH_EXERCISE_MAPPING = {
-    ("ROW", "PULL"): "FACE_PULL",
-    ("ROW", "PULL_WITH_EXTERNAL_ROTATION"): "FACE_PULL_WITH_EXTERNAL_ROTATION",
-    ("ROW", "OVER_ROW_WITH_BARBELL"): "BENT_OVER_ROW_WITH_BARBELL",
-    ("ROW", "ROW"): "DUMBBELL_ROW",
-    ("SHRUG", "RETRACTION"): "SCAPULAR_RETRACTION",
-    ("CURL", "REVERSE_WRIST_CURL"): "DUMBBELL_REVERSE_WRIST_CURL",
-    ("CURL", "HAMMER_CURL"): "DUMBBELL_HAMMER_CURL",
-    ("CURL", "EZ_BAR_BICEPS_CURL"): "STANDING_EZ_BAR_BICEPS_CURL",
-    ("FLYE", "FLYE"): "DUMBBELL_FLYE",
-    ("FLYE", "REVERSE_FLYE"): "INCLINE_REVERSE_FLYE",
-    ("SQUAT", "SQUAT"): "WEIGHTED_SQUAT",
-    ("DEADLIFT", "DEADLIFT"): "ROMANIAN_DEADLIFT",
-    ("LUNGE", "LUNGE"): "WEIGHTED_LUNGE",
-    ("ROW_BENT", "OVER_ROW_WITH_BARBELL"): "BENT_OVER_ROW_WITH_BARBELL",
-    ("ROW_DUMBBELL", "ROW"): "DUMBBELL_ROW",
-    ("CURL_DUMBBELL", "HAMMER_CURL"): "DUMBBELL_HAMMER_CURL",
-    ("CURL_STANDING", "EZ_BAR_BICEPS_CURL"): "STANDING_EZ_BAR_BICEPS_CURL",
-    ("FLYE_INCLINE", "REVERSE_FLYE"): "INCLINE_REVERSE_FLYE",
-    ("SQUAT_WEIGHTED", "SQUAT"): "WEIGHTED_SQUAT",
-    ("DEADLIFT_ROMANIAN", "DEADLIFT"): "ROMANIAN_DEADLIFT",
-    ("LUNGE_WEIGHTED", "LUNGE"): "WEIGHTED_LUNGE",
-    ("ROW_FACE", "PULL"): "FACE_PULL",
-    ("ROW_FACE", "PULL_WITH_EXTERNAL_ROTATION"): "FACE_PULL_WITH_EXTERNAL_ROTATION",
-    ("SHRUG_SCAPULAR", "RETRACTION"): "SCAPULAR_RETRACTION",
-    ("CURL_DUMBBELL", "REVERSE_WRIST_CURL"): "DUMBBELL_REVERSE_WRIST_CURL",
-    ("FLYE_DUMBBELL", "FLYE"): "DUMBBELL_FLYE",
-}
 
 
 def _resolve_strength_mapping_path(mapping_path: str | None = None) -> Path | None:
@@ -98,8 +56,12 @@ def _resolve_strength_mapping_path(mapping_path: str | None = None) -> Path | No
     elif os.environ.get(MAPPING_FILE_ENV_NAME):
         path = Path(os.environ[MAPPING_FILE_ENV_NAME]).expanduser()
     else:
-        repo_root = Path(__file__).resolve().parent.parent
-        path = repo_root / DEFAULT_MAPPING_FILENAME
+        package_root = Path(__file__).resolve().parent
+        path = package_root / PACKAGE_MAPPING_FILENAME
+        if not path.exists() or not path.is_file():
+            # Backward compatibility with legacy repo layout.
+            legacy_repo_root = package_root.parent
+            path = legacy_repo_root / LEGACY_REPO_MAPPING_FILENAME
 
     if not path.exists() or not path.is_file():
         return None
@@ -498,7 +460,7 @@ def get_strength_category_mapping(
     """
     Build category mapping used to improve Garmin write-API compatibility.
     """
-    resolved_mapping = dict(DEFAULT_STRENGTH_CATEGORY_MAPPING)
+    resolved_mapping: dict[str, str] = {}
 
     mapping_path = _resolve_strength_mapping_path()
     if mapping_path is not None:
@@ -538,7 +500,7 @@ def get_strength_exercise_mapping(
     """
     Build exercise-name mapping used to improve Garmin write-API compatibility.
     """
-    resolved_mapping = dict(DEFAULT_STRENGTH_EXERCISE_MAPPING)
+    resolved_mapping: dict[tuple[str, str], str] = {}
 
     mapping_path = _resolve_strength_mapping_path()
     if mapping_path is not None:
