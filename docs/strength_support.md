@@ -43,20 +43,25 @@ The strength flow applies strict validation before upload:
 
 ## CSV Source For Exercise Validation
 
+The exercise CSV is a whitelist of 1636 strength exercises across 40 root categories, validated against the live Garmin write API. Only root categories are included — sub-categories (e.g. `CURL_DUMBBELL`) that the write API rejects are excluded. See [`garmin_api_reference.md`](garmin_api_reference.md) for the full explanation of the read-vs-write API category problem.
+
 CSV lookup order:
 
 1. `GARMIN_STRENGTH_EXERCISES_CSV` env variable
 2. Fallback repository root file: `garmin_exercises_keys_en_fr.csv`
 
-Required CSV columns:
+CSV columns:
 
-- `key`
-- `category`
+- `key` — composite key (e.g. `CURL_DUMBBELL_BICEPS_CURL`)
+- `category` — root category accepted by the write API (e.g. `CURL`)
+- `exerciseName` — exercise name within the category (e.g. `DUMBBELL_BICEPS_CURL`)
+- `language_en`, `name_en` — English display name
+- `language_fr`, `name_fr` — French display name
 
-The pair is built as:
+The `(category, exerciseName)` pair used for validation is built as:
 
 - `category = row["category"]`
-- `exerciseName = row["key"].removeprefix(f"{category}_")`
+- `exerciseName = row["key"].removeprefix(f"{category}_")` (or from the `exerciseName` column directly)
 
 ## Numbering Normalization
 
@@ -129,31 +134,25 @@ Behavior:
 7. If `replace_existing=true`, create first, then delete matching strength workouts by name and return `replacedWorkoutIds`
 8. If deletion cleanup has errors, return `replacementCleanupErrors` without losing the newly created workout
 
-Default remaps used for retry:
+Default remaps are versioned in `garmin_workouts_mcp/config/strength_mapping.json` (single source of truth).
 
-- `ROW_FACE -> ROW`
-- `FLYE_DUMBBELL -> FLYE`
-- `CURL_DUMBBELL -> CURL`
-- `SHRUG_SCAPULAR -> SHRUG`
-- `PLANK_PLANK -> PLANK`
+Category remaps (selected examples):
+- `ROW_FACE` → `ROW`, `FLYE_DUMBBELL` → `FLYE`, `CURL_DUMBBELL` → `CURL`, `SHRUG_SCAPULAR` → `SHRUG`, `PLANK_PLANK` → `PLANK`, `DEADLIFT_ROMANIAN` → `DEADLIFT`, `SQUAT_WEIGHTED` → `SQUAT`, `LUNGE_WEIGHTED` → `LUNGE`
 
-Exercise remaps used on retry (selected examples):
+Exercise remaps (selected examples):
+- `ROW/PULL` → `FACE_PULL`, `ROW/PULL_WITH_EXTERNAL_ROTATION` → `FACE_PULL_WITH_EXTERNAL_ROTATION`
+- `SHRUG/RETRACTION` → `SCAPULAR_RETRACTION`
+- `CURL/REVERSE_WRIST_CURL` → `DUMBBELL_REVERSE_WRIST_CURL`
+- `FLYE/FLYE` → `DUMBBELL_FLYE`
+- `SQUAT/SQUAT` → `WEIGHTED_SQUAT`, `LUNGE/LUNGE` → `WEIGHTED_LUNGE`
 
-- `ROW/PULL_WITH_EXTERNAL_ROTATION -> FACE_PULL_WITH_EXTERNAL_ROTATION`
-- `SHRUG/RETRACTION -> SCAPULAR_RETRACTION`
-- `CURL/REVERSE_WRIST_CURL -> DUMBBELL_REVERSE_WRIST_CURL`
-- `FLYE/FLYE -> DUMBBELL_FLYE`
+See [`garmin_api_reference.md`](garmin_api_reference.md) for the full explanation of why exercise remaps are needed after category remaps.
 
 You can override/extend remaps with:
 
 - `GARMIN_STRENGTH_CATEGORY_MAPPING=SOURCE:TARGET,SOURCE2:TARGET2`
 - `GARMIN_STRENGTH_EXERCISE_MAPPING=CATEGORY/EXERCISE:TARGET_EXERCISE,...`
-
-Mappings are versioned in:
-
-- `garmin_workouts_mcp/config/strength_mapping.json` (packaged default)
-- Override file path with `GARMIN_STRENGTH_MAPPING_FILE=/abs/path/strength_mapping.json`
-- This file is the default source of truth for built-in remaps.
+- `GARMIN_STRENGTH_MAPPING_FILE=/abs/path/strength_mapping.json`
 
 ## Supported Rest Patterns
 

@@ -154,3 +154,40 @@ This section captures what was validated during live debugging against Garmin Co
 - Ensured default mapping file is packaged inside the Python package for wheel/docker deployments:
   - `garmin_workouts_mcp/config/strength_mapping.json`
   - declared in `pyproject.toml` via `tool.setuptools.package-data`
+
+---
+
+## Exercise CSV Whitelist Replacement (2026-03-07)
+
+### Problem
+
+The original `garmin_exercises_keys_en_fr.csv` (3464 exercises) was built from Garmin's read-side exercise catalog, which includes fine-grained sub-categories like `CURL_DUMBBELL`, `ROW_FACE`, `FLYE_DUMBBELL`, etc. The Garmin write API (`POST /workout-service/workout`) rejects these sub-categories with `400 Invalid category` — it only accepts root categories like `CURL`, `ROW`, `FLYE`.
+
+This caused a two-step failure:
+1. Validation passed (pair existed in CSV)
+2. Upload failed (API rejected the category)
+
+### Solution
+
+Replaced the CSV with an API-validated whitelist:
+- **40 root categories** (only categories the write API accepts)
+- **1636 strength exercises** (each tested against the live API)
+- Added `exerciseName` column for easier reference
+- Excluded non-strength exercises (yoga/POSE, pilates/MOVE, running, cycling, metadata)
+
+### Impact
+
+- Category remap fallback is now rarely needed (only for legacy payloads using old sub-categories)
+- Validation and upload are aligned: if validation passes, the API will accept the payload
+- No code changes required — only the CSV data was replaced
+
+### New CSV format
+
+```
+key,category,exerciseName,language_en,name_en,language_fr,name_fr
+CURL_DUMBBELL_BICEPS_CURL,CURL,DUMBBELL_BICEPS_CURL,en,Dumbbell Biceps Curl,fr,Curl biceps haltères
+```
+
+### New documentation
+
+- Added [`docs/garmin_api_reference.md`](garmin_api_reference.md) — comprehensive reference documenting all Garmin API behavior, the read-vs-write category problem, accepted root categories, payload structures, numbering rules, error patterns, and operational learnings.

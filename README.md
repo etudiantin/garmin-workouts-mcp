@@ -8,6 +8,9 @@ An MCP server that allows you to create, list, and manage Garmin Connect workout
 
 - **Create workouts**: Generate structured Garmin workouts from natural language descriptions using AI
 - **Strength native upload**: Upload full Garmin strength workout JSON without dropping category/exercise/weight metadata
+- **Validated exercise whitelist**: 1636 strength exercises across 40 root categories, validated against the live Garmin API
+- **Write-API compatibility**: Automatic category/exercise remapping when the Garmin write API rejects fine-grained categories
+- **Idempotent replacement**: Replace existing workouts by name with create-then-delete safety
 - **List workouts**: View all your existing workouts on Garmin Connect
 - **Get workout details**: Retrieve detailed information about specific workouts
 - **Schedule workouts**: Schedule workouts on specific dates in Garmin Connect
@@ -166,24 +169,16 @@ This preserves strength-specific metadata such as:
 - `endCondition` (including `reps`, `time`, and `lap.button`)
 - `RepeatGroupDTO` structure
 
-Write-API compatibility fallback:
+Write-API compatibility:
+- The exercise whitelist (`garmin_exercises_keys_en_fr.csv`) contains only the 40 root categories accepted by the Garmin write API (see [`docs/garmin_api_reference.md`](docs/garmin_api_reference.md) for the full list and explanation).
 - The tool first uploads your payload as-is.
-- If Garmin returns `Invalid category` (`400`), the server retries once with a conservative category remap.
-- Current default remaps:
-  - `ROW_FACE -> ROW`
-  - `FLYE_DUMBBELL -> FLYE`
-  - `CURL_DUMBBELL -> CURL`
-  - `SHRUG_SCAPULAR -> SHRUG`
-  - `PLANK_PLANK -> PLANK`
-- Exercise remaps are also applied on retry when needed (e.g. `ROW/PULL_WITH_EXTERNAL_ROTATION -> FACE_PULL_WITH_EXTERNAL_ROTATION`).
+- If Garmin returns `Invalid category` (`400`), the server retries once with a conservative category/exercise remap (e.g. `ROW_FACE` → `ROW`, `ROW/PULL` → `ROW/FACE_PULL`).
+- All default remaps are versioned in `garmin_workouts_mcp/config/strength_mapping.json`.
 - You can override or extend remaps with:
   - `GARMIN_STRENGTH_CATEGORY_MAPPING=SOURCE:TARGET,SOURCE2:TARGET2`
   - `GARMIN_STRENGTH_EXERCISE_MAPPING=CATEGORY/EXERCISE:TARGET_EXERCISE,...`
-- You can externalize mappings in:
-  - `garmin_workouts_mcp/config/strength_mapping.json` (packaged default)
-  - override path via `GARMIN_STRENGTH_MAPPING_FILE=/abs/path/strength_mapping.json`
-- On successful retry, response includes:
-  - `{"workoutId": "...", "categoryRemaps": {...}}`
+  - `GARMIN_STRENGTH_MAPPING_FILE=/abs/path/strength_mapping.json`
+- On successful retry, response includes `{"workoutId": "...", "categoryRemaps": {...}}`.
 - With `replace_existing=True`, matching **strength** workouts are deleted only after a successful upload:
   - response includes `replacedWorkoutIds`
   - `name_match_mode` supports `exact` or `contains`
@@ -211,9 +206,10 @@ get_workout("workout_id_here")
 ```
 
 For implementation details and complete examples, see:
-- [`docs/strength_support.md`](docs/strength_support.md)
-- [`docs/changes_strength_support.md`](docs/changes_strength_support.md)
-- [`docs/synology_update_guide.md`](docs/synology_update_guide.md)
+- [`docs/garmin_api_reference.md`](docs/garmin_api_reference.md) — Garmin API behavior, category rules, payload structure
+- [`docs/strength_support.md`](docs/strength_support.md) — Strength workflow technical details
+- [`docs/changes_strength_support.md`](docs/changes_strength_support.md) — Change log
+- [`docs/synology_update_guide.md`](docs/synology_update_guide.md) — Synology Docker deployment
 
 ### Schedule Workout
 
@@ -345,7 +341,10 @@ The `list_activities` tool supports filtering by the following activity types:
 - `GARMIN_PASSWORD`: Your Garmin Connect password (optional)
 - `GARTH_HOME`: Custom location for Garmin credentials (optional, defaults to `~/.garth`)
 - `GARMIN_STRENGTH_EXERCISES_CSV`: Path to the Garmin exercises CSV used for strict `(category, exerciseName)` validation in strength tools (optional, defaults to `garmin_exercises_keys_en_fr.csv` at repo root)
-- `garmin_exercises_keys_en_fr.csv` is versioned in this fork so strict validation works out of the box.
+- `GARMIN_STRENGTH_CATEGORY_MAPPING`: Override category remaps (`SOURCE:TARGET,SOURCE2:TARGET2`)
+- `GARMIN_STRENGTH_EXERCISE_MAPPING`: Override exercise remaps (`CATEGORY/EXERCISE:TARGET,...`)
+- `GARMIN_STRENGTH_MAPPING_FILE`: Path to a custom strength mapping JSON file
+- `garmin_exercises_keys_en_fr.csv` is versioned in this fork (1636 exercises, 40 root categories, API-validated) so strict validation works out of the box.
 
 
 ## Credits

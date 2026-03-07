@@ -310,3 +310,30 @@ La section précédente décrit l'état initial (bugs observés). Après correct
 - Upload complet des 12 séances S1/S2/S3/S4 via script.
 - Résultat: **12/12 OK** avec `emptyExerciseSteps=0`.
 - Les séances précédentes de même nom ont été remplacées correctement (`replacedWorkoutIds` renseigné).
+
+---
+
+## Résolution définitive du CSV (2026-03-07)
+
+### Problème résiduel
+
+Le CSV de validation original (3464 exercices) provenait de l'API de *lecture* Garmin et contenait des sous-catégories (`CURL_DUMBBELL`, `ROW_FACE`, etc.) que l'API d'*écriture* rejette. Cela forçait le système de remap à intervenir systématiquement, même pour des exercices courants.
+
+### Solution appliquée
+
+Remplacement complet du CSV par une whitelist validée contre l'API d'écriture :
+- **40 catégories racine** (les seules acceptées par `POST /workout-service/workout`)
+- **1636 exercices musculation** (chaque paire `category/exerciseName` testée en live)
+- Exclusion volontaire des exercices non-musculation (yoga, pilates, course, cyclisme)
+
+### Impact
+
+- **Bug 1 (PLANK_PLANK)** : résolu dès le 2026-03-01 par correction du parseur CSV.
+- **Bug 2 (400 Invalid category)** : résolu structurellement — le CSV ne contient plus que des catégories acceptées par l'API.
+- **Bug 3 (KeyError 'type' dans upload_workout)** : résolu dès le 2026-03-01 — `upload_workout` détecte les payloads natifs et redirige vers `upload_strength_workout`.
+
+### Statut final
+
+**Tous les bugs identifiés dans ce document sont résolus.** Le fork est opérationnel en production.
+
+Documentation complète de l'API Garmin : [`docs/garmin_api_reference.md`](docs/garmin_api_reference.md).
