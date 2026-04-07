@@ -135,11 +135,16 @@ The `MCP_URL` value in your `.env` is the exact string to use here.
 ### Update to latest code
 
 ```bash
-source deploy/synology/.env
-ssh ${NAS_USER}@${NAS_HOST} "
-  cd ${NAS_PATH} && git pull
-  /usr/local/bin/docker compose -f deploy/synology/docker-compose.yml up -d --build
-"
+bash deploy/synology/update.sh
+```
+
+This pushes local commits, pulls on the NAS, rebuilds and restarts the container,
+then prints the last 5 log lines. Reads `NAS_HOST`, `NAS_USER`, `NAS_PATH` from `.env`.
+
+If only `.env` or `docker-compose.yml` changed (no Python code), skip the rebuild:
+
+```bash
+bash deploy/synology/update.sh --no-rebuild
 ```
 
 ### Rotate the Bearer token
