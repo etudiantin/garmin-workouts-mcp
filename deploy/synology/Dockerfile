@@ -10,5 +10,6 @@ COPY . /app
 RUN pip install --no-cache-dir --upgrade pip \
     && pip install --no-cache-dir .
 
-# By default, keep the original package entrypoint behavior.
-CMD ["garmin-workouts-mcp"]
+EXPOSE 8001
+
+CMD ["python", "/app/deploy/synology/start.py"]

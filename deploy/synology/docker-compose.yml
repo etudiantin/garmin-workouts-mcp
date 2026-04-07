@@ -7,15 +7,16 @@ services:
     container_name: garmin-workouts-mcp-fork
     restart: unless-stopped
     environment:
-      GARTH_HOME: /data/.garth
-      GARMIN_STRENGTH_EXERCISES_CSV: /app/garmin_exercises_keys_en_fr.csv
-      # Optional fallback auth (not recommended with 2FA):
-      # GARMIN_EMAIL: your_email@example.com
-      # GARMIN_PASSWORD: your_password
+      GARTH_HOME: /garth
+      GARMIN_STRENGTH_EXERCISES_CSV: ""
+      MCP_HOST: "0.0.0.0"
+      MCP_PORT: "8001"
+      MCP_PATH: "/"
+      API_TOKEN: "a7504eef93960d6e1493bee9a753c30fdc292b2a4519b80b8c2420d7312ba2ac"
+      # Fallback si garth n'a pas de session persistée (optionnel) :
+      # GARMIN_EMAIL: votre_email@garmin.com
+      # GARMIN_PASSWORD: votre_mot_de_passe
     volumes:
-      - ./data:/data
-    command: ["garmin-workouts-mcp"]
-    # If your current MCP deployment uses HTTP/SSE, expose the same container port
-    # and change the host port during test phase to avoid conflicts:
-    # ports:
-    #   - "18000:8000"
+      - ./garth:/garth
+    ports:
+      - "8001:8001"
