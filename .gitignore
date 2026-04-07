@@ -191,3 +191,7 @@ docs/securisation-mcp-garmin.md
 
 # Claude Code local config
 .claude/
+
+# Deployment secrets
+deploy/synology/.env
+deploy/synology/garth/

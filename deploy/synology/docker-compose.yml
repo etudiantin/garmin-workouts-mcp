@@ -6,16 +6,13 @@ services:
       dockerfile: deploy/synology/Dockerfile
     container_name: garmin-workouts-mcp-fork
     restart: unless-stopped
+    env_file:
+      - .env
     environment:
       GARTH_HOME: /garth
-      GARMIN_STRENGTH_EXERCISES_CSV: ""
       MCP_HOST: "0.0.0.0"
       MCP_PORT: "8001"
       MCP_PATH: "/"
-      API_TOKEN: "a7504eef93960d6e1493bee9a753c30fdc292b2a4519b80b8c2420d7312ba2ac"
-      # Fallback si garth n'a pas de session persistée (optionnel) :
-      # GARMIN_EMAIL: votre_email@garmin.com
-      # GARMIN_PASSWORD: votre_mot_de_passe
     volumes:
       - ./garth:/garth
     ports:
