@@ -24,4 +24,4 @@ garmin-workouts-mcp = "garmin_workouts_mcp.main:main"
 packages = {find = {exclude = ["src*", "tests*"]}}
 
 [tool.setuptools.package-data]
-garmin_workouts_mcp = ["config/*.json"]
+garmin_workouts_mcp = ["config/*.json", "data/*.csv"]

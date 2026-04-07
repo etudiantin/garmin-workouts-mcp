@@ -83,9 +83,7 @@ In **Container Manager**:
 3. New container name: `garmin-workouts-mcp-fork-test`
 4. Change image to: `garmin-workouts-mcp:fork-strength`
 5. Keep same env + volumes as current container
-6. Add env var:
-   - `GARMIN_STRENGTH_EXERCISES_CSV=/app/garmin_exercises_keys_en_fr.csv`
-7. Change host port to avoid conflict (example old `8000` -> new `18000`)
+6. Change host port to avoid conflict (example old `8000` -> new `18000`)
 8. Start test container
 
 Why duplicate settings:
@@ -157,6 +155,4 @@ Then restart/recreate your fork container in Container Manager.
 ## Notes
 
 - Garmin may keep deleted workouts accessible by direct ID lookup for a while, even if not listed.
-- Strict exercise validation depends on the CSV file:
-  - `garmin_exercises_keys_en_fr.csv`
-  - or `GARMIN_STRENGTH_EXERCISES_CSV` override path
+- Strict exercise validation uses `garmin_exercises_keys_en_fr.csv`, bundled inside the package — no extra file or env var required. Use `GARMIN_STRENGTH_EXERCISES_CSV` only to supply a custom CSV override.

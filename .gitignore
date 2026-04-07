@@ -188,3 +188,6 @@ Thumbs.db
 
 # Personal/sensitive local documentation
 docs/securisation-mcp-garmin.md
+
+# Claude Code local config
+.claude/

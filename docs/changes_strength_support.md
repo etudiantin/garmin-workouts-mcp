@@ -191,3 +191,19 @@ CURL_DUMBBELL_BICEPS_CURL,CURL,DUMBBELL_BICEPS_CURL,en,Dumbbell Biceps Curl,fr,C
 ### New documentation
 
 - Added [`docs/garmin_api_reference.md`](garmin_api_reference.md) — comprehensive reference documenting all Garmin API behavior, the read-vs-write category problem, accepted root categories, payload structures, numbering rules, error patterns, and operational learnings.
+
+---
+
+## CSV Packaging Fix (2026-03-12)
+
+### Problem
+
+`garmin_exercises_keys_en_fr.csv` was stored at the repository root and not declared as package data. The default fallback path used `Path(__file__).parent.parent`, which resolves correctly in a development clone but points to `site-packages/` after `pip install` — causing an immediate `ValueError` when using strength tools in any installed environment without `GARMIN_STRENGTH_EXERCISES_CSV` explicitly set.
+
+### Solution
+
+- Moved `garmin_exercises_keys_en_fr.csv` into the package: `garmin_workouts_mcp/data/`
+- Declared it in `pyproject.toml`: `garmin_workouts_mcp = ["config/*.json", "data/*.csv"]`
+- Fixed the fallback path in `_resolve_exercise_csv_path()`: `Path(__file__).parent / "data" / DEFAULT_CSV_FILENAME`
+
+The CSV is now bundled with the wheel and resolved correctly in all environments. `GARMIN_STRENGTH_EXERCISES_CSV` remains supported as a priority override for custom CSV paths (no breaking change).

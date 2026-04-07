@@ -340,11 +340,11 @@ The `list_activities` tool supports filtering by the following activity types:
 - `GARMIN_EMAIL`: Your Garmin Connect email address (optional)
 - `GARMIN_PASSWORD`: Your Garmin Connect password (optional)
 - `GARTH_HOME`: Custom location for Garmin credentials (optional, defaults to `~/.garth`)
-- `GARMIN_STRENGTH_EXERCISES_CSV`: Path to the Garmin exercises CSV used for strict `(category, exerciseName)` validation in strength tools (optional, defaults to `garmin_exercises_keys_en_fr.csv` at repo root)
+- `GARMIN_STRENGTH_EXERCISES_CSV`: Path to a custom Garmin exercises CSV for strict `(category, exerciseName)` validation (optional — the bundled `garmin_exercises_keys_en_fr.csv` is used by default, no file required)
 - `GARMIN_STRENGTH_CATEGORY_MAPPING`: Override category remaps (`SOURCE:TARGET,SOURCE2:TARGET2`)
 - `GARMIN_STRENGTH_EXERCISE_MAPPING`: Override exercise remaps (`CATEGORY/EXERCISE:TARGET,...`)
 - `GARMIN_STRENGTH_MAPPING_FILE`: Path to a custom strength mapping JSON file
-- `garmin_exercises_keys_en_fr.csv` is versioned in this fork (1636 exercises, 40 root categories, API-validated) so strict validation works out of the box.
+- `garmin_exercises_keys_en_fr.csv` (1636 exercises, 40 root categories, API-validated) is bundled inside the package — strict validation works out of the box after `pip install`, no extra file required.
 
 
 ## Credits

@@ -647,13 +647,12 @@ def _resolve_exercise_csv_path(csv_path: str | None = None) -> Path:
     elif os.environ.get(CSV_ENV_NAME):
         path = Path(os.environ[CSV_ENV_NAME]).expanduser()
     else:
-        repo_root = Path(__file__).resolve().parent.parent
-        path = repo_root / DEFAULT_CSV_FILENAME
+        path = Path(__file__).resolve().parent / "data" / DEFAULT_CSV_FILENAME
 
     if not path.exists() or not path.is_file():
         raise ValueError(
-            f"Exercise CSV file not found: {path}. Set {CSV_ENV_NAME} or place "
-            f"{DEFAULT_CSV_FILENAME} at the repository root."
+            f"Exercise CSV file not found: {path}. Set {CSV_ENV_NAME} to provide "
+            f"a custom path to {DEFAULT_CSV_FILENAME}."
         )
 
     return path

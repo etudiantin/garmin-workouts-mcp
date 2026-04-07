@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "garmin-workouts-dev": {
+      "command": "C:\\Users\\Pierr\\AppData\\Local\\Programs\\Python\\Python313\\python.exe",
+      "args": ["-m", "garmin_workouts_mcp.main"],
+      "cwd": "C:\\Users\\Pierr\\Documents\\Fork\\garmin-workouts-mcp"
+    }
+  }
+}

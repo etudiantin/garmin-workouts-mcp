@@ -47,16 +47,16 @@ The exercise CSV is a whitelist of 1636 strength exercises across 40 root catego
 
 CSV lookup order:
 
-1. `GARMIN_STRENGTH_EXERCISES_CSV` env variable
-2. Fallback repository root file: `garmin_exercises_keys_en_fr.csv`
+1. `GARMIN_STRENGTH_EXERCISES_CSV` env variable (custom path override)
+2. Bundled package file: `garmin_workouts_mcp/data/garmin_exercises_keys_en_fr.csv`
 
 CSV columns:
 
 - `key` — composite key (e.g. `CURL_DUMBBELL_BICEPS_CURL`)
 - `category` — root category accepted by the write API (e.g. `CURL`)
 - `exerciseName` — exercise name within the category (e.g. `DUMBBELL_BICEPS_CURL`)
-- `language_en`, `name_en` — English display name
-- `language_fr`, `name_fr` — French display name
+- `name_en` — English display name
+- `name_fr` — French display name
 
 The `(category, exerciseName)` pair used for validation is built as:
 
