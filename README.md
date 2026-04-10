@@ -347,6 +347,20 @@ The `list_activities` tool supports filtering by the following activity types:
 - `garmin_exercises_keys_en_fr.csv` (1636 exercises, 40 root categories, API-validated) is bundled inside the package — strict validation works out of the box after `pip install`, no extra file required.
 
 
+## Development
+
+Requires Python 3.10+.
+
+```bash
+make init    # create .venv and install all dependencies (runtime + dev)
+make test    # run test suite with coverage
+make lint    # ruff check
+```
+
+`make init` creates a `.venv` in the repo root and installs the package in editable
+mode along with dev dependencies from `requirements.txt`. Run `source .venv/bin/activate`
+(or `.venv\Scripts\activate` on Windows) before running `pytest` or `python -m` commands directly.
+
 ## Credits
 
 This project incorporates ideas and prompt designs inspired by [openai-garmin-workout](https://github.com/veelenga/openai-garmin-workout), which is licensed under the MIT License.

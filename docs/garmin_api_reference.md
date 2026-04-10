@@ -29,14 +29,24 @@ The API uses OAuth tokens managed by the `garth` library.
 
 ## Sport Type IDs
 
-| sportTypeId | sportTypeKey | Display |
+These are the IDs validated for **workout creation** (`POST /workout-service/workout`).
+Only these six are accepted by `upload_workout` / `SPORT_TYPE_MAPPING`.
+
+| sportTypeId | sportTypeKey | `upload_workout` key |
 |---|---|---|
-| 1 | `running` | Running |
-| 2 | `cycling` | Cycling |
-| 4 | `swimming` | Swimming |
-| 5 | `strength_training` | Strength Training |
-| 6 | `cardio_training` | Cardio |
-| 11 | `walking` | Walking |
+| 1 | `running` | `"running"` |
+| 2 | `cycling` | `"cycling"` |
+| 4 | `swimming` | `"swimming"` |
+| 5 | `strength_training` | `"strength"` |
+| 6 | `cardio_training` | `"cardio"` |
+| 11 | `walking` | `"walking"` |
+
+> **Note — activityType vs sportType**: `list_activities` accepts a much wider
+> `activityType` filter (`hiking`, `yoga`, `surfing`, etc.) because it filters
+> *completed activities*, not workouts. Those strings are **not** valid for
+> workout creation and will raise `ValueError: Unsupported sport type`.
+> Other sportTypeIds exist in Garmin's system but have not been validated
+> against the write API — do not add them to `SPORT_TYPE_MAPPING` without live testing.
 
 ## Calendar API Quirk
 
