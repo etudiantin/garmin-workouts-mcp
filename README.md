@@ -344,6 +344,7 @@ The `list_activities` tool supports filtering by the following activity types:
 - `GARMIN_STRENGTH_CATEGORY_MAPPING`: Override category remaps (`SOURCE:TARGET,SOURCE2:TARGET2`)
 - `GARMIN_STRENGTH_EXERCISE_MAPPING`: Override exercise remaps (`CATEGORY/EXERCISE:TARGET,...`)
 - `GARMIN_STRENGTH_MAPPING_FILE`: Path to a custom strength mapping JSON file
+- `GARMIN_STRENGTH_PAYLOAD_LOG_DIR`: Directory where raw `upload_strength_workout` payloads are appended as JSON files for later validation calibration (optional, defaults to `logs/strength_payloads`). Append-only — no automatic rotation or purge.
 - `garmin_exercises_keys_en_fr.csv` (1636 exercises, 40 root categories, API-validated) is bundled inside the package — strict validation works out of the box after `pip install`, no extra file required.
 
 

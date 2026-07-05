@@ -13,7 +13,9 @@ services:
       MCP_HOST: "0.0.0.0"
       MCP_PORT: "8001"
       MCP_PATH: "/"
+      GARMIN_STRENGTH_PAYLOAD_LOG_DIR: /app/logs/strength_payloads
     volumes:
       - ./garth:/garth
+      - ./logs:/app/logs
     ports:
       - "8001:8001"

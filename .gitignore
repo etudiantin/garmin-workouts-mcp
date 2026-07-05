@@ -195,3 +195,6 @@ docs/securisation-mcp-garmin.md
 # Deployment secrets
 deploy/synology/.env
 deploy/synology/garth/
+
+# Strength workout payload log corpus (append-only, not for version control)
+logs/

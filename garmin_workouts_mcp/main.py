@@ -10,6 +10,7 @@ from .strength_workout import (
     prepare_strength_workout_payload,
 )
 from .strength_upload_service import upload_strength_workout_payload
+from .payload_logger import extract_workout_name, log_payload
 
 LIST_WORKOUTS_ENDPOINT = "/workout-service/workouts"
 GET_WORKOUT_ENDPOINT = "/workout-service/workout/{workout_id}"
@@ -296,6 +297,7 @@ def upload_strength_workout(
     Returns:
         The uploaded workout's ID on Garmin Connect.
     """
+    log_payload(workout_data, extract_workout_name(workout_data))
     logger.info("Strength workout data received from client: %s", workout_data)
 
     if isinstance(workout_data, dict) and "workout" in workout_data and "workoutName" not in workout_data:

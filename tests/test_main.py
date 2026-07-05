@@ -1,3 +1,4 @@
+import json
 import pytest
 from unittest.mock import patch
 
@@ -730,6 +731,10 @@ class TestUploadWorkout:
 class TestStrengthWorkoutTools:
     """Test cases for build_strength_workout and upload_strength_workout tools."""
 
+    @pytest.fixture(autouse=True)
+    def _isolate_payload_log_dir(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("GARMIN_STRENGTH_PAYLOAD_LOG_DIR", str(tmp_path / "strength_payloads"))
+
     @patch("garmin_workouts_mcp.main.prepare_strength_workout_payload")
     @patch("garmin_workouts_mcp.main.build_strength_workout_from_simple")
     def test_build_strength_workout_simple_success(self, mock_build_simple, mock_prepare):
@@ -1072,6 +1077,54 @@ class TestStrengthWorkoutTools:
             },
         }
         assert mock_connectapi.call_count == 2
+
+    @patch("garmin_workouts_mcp.main.prepare_strength_workout_payload")
+    @patch("garmin_workouts_mcp.main.garth.connectapi")
+    def test_upload_strength_workout_logs_raw_payload_before_processing(
+        self, mock_connectapi, mock_prepare, tmp_path
+    ):
+        import garmin_workouts_mcp.main as main_module
+
+        upload_strength_workout_func = main_module.upload_strength_workout.fn
+        workout_data = _native_strength_workout_payload()
+        normalized_payload = _native_strength_workout_payload()
+        normalized_payload["description"] = "normalized, should not match raw log"
+
+        mock_prepare.return_value = normalized_payload
+        mock_connectapi.return_value = {"workoutId": "strength_123"}
+
+        upload_strength_workout_func(workout_data)
+
+        logged_files = list((tmp_path / "strength_payloads").glob("*.json"))
+        assert len(logged_files) == 1
+        assert json.loads(logged_files[0].read_text(encoding="utf-8")) == workout_data
+
+    @patch("garmin_workouts_mcp.main.prepare_strength_workout_payload")
+    @patch("garmin_workouts_mcp.main.garth.connectapi")
+    def test_upload_strength_workout_still_succeeds_when_log_dir_unwritable(
+        self, mock_connectapi, mock_prepare, tmp_path, monkeypatch
+    ):
+        import garmin_workouts_mcp.main as main_module
+
+        unwritable_path = tmp_path / "not_a_directory"
+        unwritable_path.write_text("occupied by a file, not a directory")
+        monkeypatch.setenv("GARMIN_STRENGTH_PAYLOAD_LOG_DIR", str(unwritable_path))
+
+        upload_strength_workout_func = main_module.upload_strength_workout.fn
+        workout_data = _native_strength_workout_payload()
+        normalized_payload = _native_strength_workout_payload()
+
+        mock_prepare.return_value = normalized_payload
+        mock_connectapi.return_value = {"workoutId": "strength_123"}
+
+        result = upload_strength_workout_func(workout_data)
+
+        mock_connectapi.assert_called_once_with(
+            "/workout-service/workout",
+            method="POST",
+            json=normalized_payload
+        )
+        assert result == {"workoutId": "strength_123"}
 
 
 class TestGetCalendar:
